@@ -136,7 +136,7 @@ export function TerminalShell() {
       />
       <SettingsDialog />
       <HeaderBar />
-      {hideChrome ? null : <TickerTape />}
+      {chartFocus ? null : <TickerTape />}
       {desktop ? (
         <DesktopLayout chartFocus={chartFocus} />
       ) : (

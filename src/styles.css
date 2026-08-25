@@ -148,6 +148,11 @@
   height: 100%;
 }
 
+:fullscreen .tape-track,
+:-webkit-full-screen .tape-track {
+  animation: tape-scroll 42s linear infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .tape-track,
   .led-live,

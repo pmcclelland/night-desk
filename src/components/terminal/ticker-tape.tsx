@@ -34,7 +34,7 @@ export function TickerTape() {
   );
 
   return (
-    <div className="relative h-8 overflow-hidden border-b border-border bg-bg">
+    <div className="relative h-8 shrink-0 overflow-hidden border-b border-border bg-bg">
       <div className={cn("tape-track flex w-max", items.length < 6 && "md:animate-none")}>
         {row}
         {row}
