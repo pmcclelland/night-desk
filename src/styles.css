@@ -1,0 +1,158 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@theme {
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --color-bg: #050608;
+  --color-surface: #0b0d11;
+  --color-elevated: #12151c;
+  --color-fg: #dcd8cc;
+  --color-muted: #7c7a70;
+  --color-subtle: #4e4d47;
+  --color-accent: #e39400;
+  --color-accent-fg: #050608;
+  --color-up: #2ecf8a;
+  --color-down: #ef4d4d;
+  --color-border: #1e232c;
+  --color-ring: #e39400;
+
+  --text-micro: 0.5625rem;
+  --text-2xs: 0.6875rem;
+
+  --radius-xs: 2px;
+  --radius-sm: 3px;
+  --radius-md: 5px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius: 5px;
+}
+
+:root {
+  --motion-stagger: 40ms;
+  --motion-micro: 80ms;
+  --motion-quick: 150ms;
+  --motion-fast: 250ms;
+  --motion-medium: 350ms;
+  --motion-slow: 400ms;
+  --ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: ease-in-out;
+  --motion-y-micro: 4px;
+  --motion-scale-modal: 0.96;
+}
+
+@layer base {
+  html {
+    background: var(--color-bg);
+    color: var(--color-fg);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    min-height: 100dvh;
+    overflow: hidden;
+    background: var(--color-bg);
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--color-accent) 40%, transparent);
+    color: var(--color-fg);
+  }
+
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+}
+
+.tape-track {
+  animation: tape-scroll 42s linear infinite;
+}
+
+.tape-track:hover {
+  animation-play-state: paused;
+}
+
+@keyframes tape-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes pulse-led {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.led-live {
+  animation: pulse-led 1.6s ease-in-out infinite;
+}
+
+@keyframes boot-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--motion-y-micro));
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+.boot-line {
+  animation: boot-in var(--motion-slow) var(--ease-smooth-out) both;
+}
+
+@keyframes cursor-blink {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.console-cursor {
+  animation: cursor-blink 1.1s steps(1) infinite;
+}
+
+.desk-fs {
+  background: var(--color-bg);
+}
+
+:fullscreen,
+:-webkit-full-screen {
+  background: var(--color-bg);
+  width: 100%;
+  height: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tape-track,
+  .led-live,
+  .boot-line,
+  .console-cursor {
+    animation: none;
+  }
+}

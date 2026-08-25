@@ -1,0 +1,36 @@
+{
+  "url": "http://127.0.0.1:8080/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "NIGHTDESK",
+      "hasCanvas": false,
+      "bodyTextLen": 1875,
+      "bodyTextHash": "ed93c8b52b1fc3666c6463ee4cc7da4305a88baedf3e860818ac320fe0209c94",
+      "bodyTextPrefix": "NIGHTDESK SIM YH MARKET OPEN 12:28:50 Tue, Aug 25 ET 3h 31m to c",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "NIGHTDESK",
+      "hasCanvas": false,
+      "bodyTextLen": 790,
+      "bodyTextHash": "1f1e01b510e8a0d91a818fca4a1edd8ef5bf69b0415d558dec1896fee92a7331",
+      "bodyTextPrefix": "NIGHTDESK EQ $100,794 DAY +$338.23 +0.34% SPY 765.66 +0.29% QQQ ",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/app-builder-preview.json"
+}
