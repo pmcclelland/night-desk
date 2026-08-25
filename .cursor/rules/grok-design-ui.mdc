@@ -1,0 +1,32 @@
+---
+description: Load .grok/skills (via .cursor/skills) before overlay, HUD, Paper, or CSS work. For local Cursor, Grok Bot, and Cloud Agents.
+alwaysApply: true
+---
+
+# Grok skills in Cursor
+
+Ignore this rule unless the workspace contains `.grok/skills/`.
+
+Grok App Builder lists those skills automatically. Cursor, Cloud Agents, and Grok Bot coding agents do not — unless they are also on a Cursor discovery path (this repo exposes them as `.cursor/skills` → `.grok/skills`).
+
+Before UI work, **Read** the matching `SKILL.md` (and `references/` on demand). Do not restyle from memory or Paper skills alone.
+
+## Before overlay / design work
+
+If the task is DOM UI, game chrome (title, HUD, pause, game over, scores), Paper `code-to-design` / `design-to-code`, tokens, theme, CSS, or restyle:
+
+1. Read `.grok/skills/design-ui/SKILL.md` first (same files as `.cursor/skills/design-ui`).
+2. Load `design-ui/references/` as needed (`refined-ui`, `typography`, `surfaces`, `animations`).
+3. Follow that doctrine. Do not invent a parallel visual system.
+
+Also read:
+
+- `.grok/skills/building-games/SKILL.md` for canvas / 3D / gameplay (both skills when a game has overlay chrome)
+- `.grok/skills/controls/SKILL.md` before WASD / vehicle / flight
+- `auth` / `neon` only when that project's `AGENTS.md` §0.5 says so
+
+Do not call `imagine_*` unless those tools are actually listed.
+
+## Paper handoff
+
+Paper is the visual source of truth. Implement only the requested delta. Copy-only asks stay copy-only. Do not ship Paper-only chrome (device status bars, decorative stand-ins) into the app.
