@@ -75,7 +75,7 @@
 }
 
 .tape-track {
-  animation: tape-scroll 42s linear infinite;
+  animation: tape-scroll var(--tape-duration, 42s) linear infinite;
 }
 
 .tape-track:hover {
@@ -150,7 +150,7 @@
 
 :fullscreen .tape-track,
 :-webkit-full-screen .tape-track {
-  animation: tape-scroll 42s linear infinite;
+  animation: tape-scroll var(--tape-duration, 42s) linear infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
