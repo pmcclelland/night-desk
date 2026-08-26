@@ -1,3 +1,4 @@
+import { mergeBotLogs } from "@/lib/bot-log";
 import { persistDesk, pullDesk } from "@/lib/server/desk-api";
 import { useDesk } from "@/lib/store";
 
@@ -29,7 +30,7 @@ export async function hydrateDesk() {
       await persistNow();
       return;
     }
-    applyPulledDesk(desk);
+    applyPulledDesk({ ...desk, botLog: mergeBotLogs(local.botLog, desk.botLog) });
   } catch {
     /* signed out or not owner */
   } finally {

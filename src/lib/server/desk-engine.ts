@@ -7,6 +7,7 @@ import {
   snapshotAlpaca,
   submitAlpacaOrderInner,
 } from "@/lib/server/alpaca";
+import { mergeBotLogs } from "@/lib/bot-log";
 import { loadBars, loadQuotes } from "@/lib/server/market";
 import { loadDesk, saveDesk, type DeskSnapshot } from "@/lib/server/desk-store";
 import { localThesis } from "@/lib/indicators";
@@ -114,6 +115,8 @@ export type DeskOp =
   | { op: "set_risk"; risk: Partial<RiskSettings> }
   | { op: "reset_sim" }
   | { op: "thesis"; symbol?: string }
+  | { op: "bot_log"; limit?: number }
+  | { op: "bot_say"; text: string }
   | { op: "save_client"; snapshot: Omit<DeskSnapshot, "updatedAt" | "creds"> & { creds?: { keyId: string } | null } };
 
 export type DeskOpExtra = {
@@ -132,6 +135,7 @@ export type DeskOpExtra = {
     armed: boolean;
     lastSignal: string;
   }>;
+  botLog?: Array<{ at: string; kind: BotLine["kind"]; text: string }>;
 };
 
 export type DeskOpResult = {
@@ -270,6 +274,28 @@ async function runOp(desk: DeskSnapshot, op: DeskOp): Promise<DeskOpResult> {
     return { ok: true, message: next.botLog.at(-1)?.text, desk: next, extra: { account: ping.account } };
   }
 
+  if (op.op === "bot_log") {
+    const limit = Math.min(200, Math.max(1, Math.floor(op.limit ?? 40)));
+    const lines = desk.botLog.slice(-limit).map((l) => ({
+      at: new Date(l.t).toISOString(),
+      kind: l.kind,
+      text: l.text,
+    }));
+    return {
+      ok: true,
+      message: lines.length ? `${lines.length} bot line(s)` : "BOT tape is empty",
+      desk,
+      extra: { botLog: lines },
+    };
+  }
+
+  if (op.op === "bot_say") {
+    const text = op.text.trim().slice(0, 500);
+    if (!text) return { ok: false, error: "text is required", desk };
+    const next = log(desk, "ai", text);
+    return { ok: true, message: text, desk: next };
+  }
+
   if (op.op === "thesis") {
     const symbol = (op.symbol || desk.selected).toUpperCase();
     const pack = await quotesFor(desk);
@@ -380,7 +406,7 @@ async function runOp(desk: DeskSnapshot, op: DeskOp): Promise<DeskOpResult> {
       selected: op.snapshot.selected,
       sim: op.snapshot.sim,
       strategies: op.snapshot.strategies,
-      botLog: op.snapshot.botLog,
+      botLog: mergeBotLogs(desk.botLog, op.snapshot.botLog),
       risk: op.snapshot.risk,
       halted: op.snapshot.halted,
       creds: desk.creds,

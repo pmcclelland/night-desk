@@ -19,7 +19,7 @@ const SERVER_INFO = {
   title: "NightDesk",
 };
 
-const INSTRUCTIONS = `NightDesk is a single-operator trading desk. Tools act on the owner's live venue (SIM, Alpaca paper, or Alpaca live). Halt and risk caps apply. Prefer desk_status before trading. Do not flatten or place live orders unless the operator clearly asked.`;
+const INSTRUCTIONS = `NightDesk is a single-operator trading desk. Tools act on the owner's live venue (SIM, Alpaca paper, or Alpaca live). Halt and risk caps apply. Prefer desk_status before trading. Do not flatten or place live orders unless the operator clearly asked. bot_log reads the BOT panel tape; bot_say posts a line the operator sees there.`;
 
 const TOOLS = [
   {
@@ -117,6 +117,23 @@ const TOOLS = [
       required: ["text"],
     },
   },
+  {
+    name: "bot_log",
+    description: "Read recent lines from the operator BOT panel.",
+    inputSchema: {
+      type: "object",
+      properties: { limit: { type: "number", description: "How many lines, default 40, max 200" } },
+    },
+  },
+  {
+    name: "bot_say",
+    description: "Post a line to the operator BOT panel. Use for status the operator should see on the desk.",
+    inputSchema: {
+      type: "object",
+      properties: { text: { type: "string" } },
+      required: ["text"],
+    },
+  },
 ];
 
 function ok(id: JsonRpcId, result: unknown) {
@@ -192,6 +209,8 @@ async function callTool(userId: string, name: string, args: Record<string, unkno
     if (name === "thesis") {
       return { op: "thesis", symbol: typeof args.symbol === "string" ? args.symbol : undefined };
     }
+    if (name === "bot_log") return { op: "bot_log", limit: num(args.limit) };
+    if (name === "bot_say" && typeof args.text === "string") return { op: "bot_say", text: args.text };
     if (name === "place_order" && typeof args.symbol === "string") {
       const qty = num(args.qty);
       if (!qty) return null;
