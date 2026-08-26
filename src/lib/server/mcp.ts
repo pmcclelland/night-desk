@@ -18,7 +18,7 @@ const SERVER_INFO = {
   title: "NightDesk",
 };
 
-const INSTRUCTIONS = `NightDesk is a single-operator trading desk. Tools act on the owner's live venue (SIM, Alpaca paper, or Alpaca live). Halt and risk caps apply. Prefer desk_status before trading. Do not flatten or place live orders unless the operator clearly asked. bot_log reads the BOT panel tape; bot_say posts a line the operator sees there.`;
+const INSTRUCTIONS = `NightDesk is a single-operator trading desk. Tools act on the owner's live venue (SIM, Alpaca paper, or Alpaca live). Halt and risk caps apply. Prefer desk_status before trading. Do not flatten or place live orders unless the operator clearly asked. bot_log reads the BOT panel tape; bot_say posts a line the operator sees there; bot_clear wipes the tape.`;
 
 const TOOLS = [
   {
@@ -123,6 +123,11 @@ const TOOLS = [
       required: ["text"],
     },
   },
+  {
+    name: "bot_clear",
+    description: "Clear the operator BOT panel tape.",
+    inputSchema: { type: "object", properties: {} },
+  },
 ];
 
 function ok(id: JsonRpcId, result: unknown) {
@@ -194,6 +199,7 @@ async function callTool(userId: string, name: string, args: Record<string, unkno
     }
     if (name === "bot_log") return { op: "bot_log", limit: num(args.limit) };
     if (name === "bot_say" && typeof args.text === "string") return { op: "bot_say", text: args.text };
+    if (name === "bot_clear") return { op: "bot_clear" };
     if (name === "place_order" && typeof args.symbol === "string") {
       const qty = num(args.qty);
       if (!qty) return null;

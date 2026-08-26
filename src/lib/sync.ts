@@ -22,7 +22,7 @@ import {
   submitAlpacaOrder,
 } from "@/lib/server/trade";
 import { runDeskOp } from "@/lib/server/desk-api";
-import { queuePersist } from "@/lib/desk-sync";
+import { applyPulledDesk, queuePersist, selectSymbol } from "@/lib/desk-sync";
 import { selectAccount, selectPositions, useDesk } from "@/lib/store";
 import type { OrderRequest, Venue } from "@/lib/types";
 
@@ -337,13 +337,29 @@ export async function runThesis(symbol: string) {
   queuePersist();
 }
 
+export async function clearBotTape() {
+  useDesk.getState().clearBotLog();
+  try {
+    const result = await runDeskOp({ data: { op: "bot_clear" } });
+    if (result.ok && result.desk) applyPulledDesk(result.desk);
+  } catch {
+    /* owner-only */
+  }
+}
+
 export async function runConsole(raw: string) {
   const s = useDesk.getState();
   const text = raw.trim();
   if (!text) return;
-  s.log("cmd", text);
   const last = s.quotes[s.selected]?.last;
   const cmd = parseCommand(text, last);
+
+  if (cmd?.op === "clear") {
+    await clearBotTape();
+    return;
+  }
+
+  s.log("cmd", text);
 
   if (!cmd) {
     s.log("sys", "Unknown command. Type HELP. Freeform goes to the Grok Bot.");
@@ -391,7 +407,7 @@ export async function runConsole(raw: string) {
     return;
   }
   if (cmd.op === "thesis") {
-    s.setSelected(cmd.symbol);
+    selectSymbol(cmd.symbol);
     await runThesis(cmd.symbol);
     return;
   }
@@ -415,9 +431,8 @@ export async function runConsole(raw: string) {
     return;
   }
   if (cmd.op === "select") {
-    s.setSelected(cmd.symbol);
     if (!s.watchlist.includes(cmd.symbol)) s.addWatch(cmd.symbol);
-    queuePersist();
+    selectSymbol(cmd.symbol);
     return;
   }
   if (cmd.op === "order") {

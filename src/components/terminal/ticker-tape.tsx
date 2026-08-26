@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState, type CSSProperties, type Ref } from "react";
 import { pct, px, signClass } from "@/lib/format";
+import { selectSymbol } from "@/lib/desk-sync";
 import { useDesk } from "@/lib/store";
 import type { Quote } from "@/lib/types";
 
@@ -42,7 +43,6 @@ function TapeRow({
 export function TickerTape() {
   const watchlist = useDesk((s) => s.watchlist);
   const quotes = useDesk((s) => s.quotes);
-  const setSelected = useDesk((s) => s.setSelected);
   const items = watchlist.map((sym) => quotes[sym]).filter(Boolean);
   const viewportRef = useRef<HTMLDivElement>(null);
   const unitRef = useRef<HTMLDivElement>(null);
@@ -97,7 +97,7 @@ export function TickerTape() {
           <TapeRow
             key={i}
             items={items}
-            onSelect={setSelected}
+            onSelect={selectSymbol}
             unitRef={i === 0 ? unitRef : undefined}
             duplicate={i > 0}
           />

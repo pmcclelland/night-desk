@@ -9,6 +9,7 @@ export type BotCommand =
   | { op: "resume" }
   | { op: "status" }
   | { op: "help" }
+  | { op: "clear" }
   | { op: "thesis"; symbol: string }
   | { op: "watch"; action: "add" | "rm"; symbol: string }
   | { op: "arm"; id: string }
@@ -26,7 +27,7 @@ const HELP = `Commands
   ARM sma-spy | DISARM sma-spy
   THESIS NVDA
   WATCH ADD AMD | WATCH RM AMD
-  HALT | RESUME | STATUS | HELP
+  HALT | RESUME | STATUS | HELP | CLEAR
 Freeform lives on the Grok Bot.`;
 
 export function helpText() {
@@ -45,6 +46,7 @@ export function parseCommand(raw: string, lastPrice?: number): BotCommand | null
   const u = text.toUpperCase();
 
   if (u === "HELP" || u === "?") return { op: "help" };
+  if (u === "CLEAR" || u === "CLS" || u === "CLR") return { op: "clear" };
   if (u === "STATUS" || u === "POS" || u === "POSITIONS") return { op: "status" };
   if (u === "HALT" || u === "KILL" || u === "KILL SWITCH" || u === "STOP BOT") return { op: "halt" };
   if (u === "RESUME" || u === "UNHALT") return { op: "resume" };

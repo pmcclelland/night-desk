@@ -1,4 +1,5 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
+import { parseBotTape, serializeBotTape } from "@/lib/bot-log";
 import { getSql } from "@/lib/db";
 import { createStarterBook, type SimBook } from "@/lib/sim";
 import { defaultStrategies } from "@/lib/strategies";
@@ -13,6 +14,7 @@ export type DeskSnapshot = {
   sim: SimBook;
   strategies: StrategyInstance[];
   botLog: BotLine[];
+  botLogClearedAt: number;
   risk: RiskSettings;
   halted: boolean;
   updatedAt: string;
@@ -70,6 +72,7 @@ function emptyDesk(): Omit<DeskSnapshot, "updatedAt"> {
     sim: createStarterBook(),
     strategies: defaultStrategies(),
     botLog: [],
+    botLogClearedAt: 0,
     risk: { maxDailyLossPct: 2, maxPositionPct: 15, defaultQty: 10 },
     halted: false,
   };
@@ -144,6 +147,7 @@ export async function loadDesk(userId: string): Promise<DeskSnapshot> {
     return { ...fresh, updatedAt: new Date().toISOString() };
   }
   const base = emptyDesk();
+  const tape = parseBotTape(row.bot_log);
   const venue: Venue =
     row.venue === "alpaca-live" || row.venue === "alpaca-paper" || row.venue === "sim"
       ? row.venue
@@ -155,7 +159,8 @@ export async function loadDesk(userId: string): Promise<DeskSnapshot> {
     selected: row.selected || base.selected,
     sim: parseJson(row.sim, base.sim),
     strategies: parseJson(row.strategies, base.strategies),
-    botLog: parseJson(row.bot_log, base.botLog),
+    botLog: tape.lines,
+    botLogClearedAt: tape.clearedAt,
     risk: parseJson(row.risk, base.risk),
     halted: Boolean(row.halted),
     updatedAt: asIso(row.updated_at),
@@ -180,7 +185,7 @@ export async function saveDesk(
       ${desk.selected},
       ${JSON.stringify(desk.sim)}::jsonb,
       ${JSON.stringify(desk.strategies)}::jsonb,
-      ${JSON.stringify(desk.botLog.slice(-200))}::jsonb,
+      ${serializeBotTape({ lines: desk.botLog, clearedAt: desk.botLogClearedAt })}::jsonb,
       ${JSON.stringify(desk.risk)}::jsonb,
       ${desk.halted},
       now()

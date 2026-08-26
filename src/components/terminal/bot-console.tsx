@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { clockTime } from "@/lib/format";
 import { useDesk } from "@/lib/store";
-import { runConsole } from "@/lib/sync";
+import { clearBotTape, runConsole } from "@/lib/sync";
 import { Panel } from "@/components/terminal/panel";
 import { cn } from "@/lib/cn";
 
@@ -48,7 +48,19 @@ export function BotConsole() {
   }
 
   return (
-    <Panel title={halted ? "Bot · Halted" : "Bot"} bodyClassName="flex min-h-0 flex-col overflow-hidden">
+    <Panel
+      title={halted ? "Bot · Halted" : "Bot"}
+      bodyClassName="flex min-h-0 flex-col overflow-hidden"
+      action={
+        <button
+          type="button"
+          className="font-mono text-micro tracking-widest text-subtle uppercase hover:text-fg"
+          onClick={() => void clearBotTape()}
+        >
+          Clr
+        </button>
+      }
+    >
       <div ref={scroller} className="min-h-0 flex-1 overflow-auto px-2 py-1 font-mono text-2xs leading-5">
         {log.map((line) => (
           <div key={line.id} className="flex gap-2">
@@ -71,7 +83,7 @@ export function BotConsole() {
           ref={input}
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="BUY 10 NVDA  ·  THESIS AAPL  ·  HALT"
+          placeholder="BUY 10 NVDA  ·  THESIS AAPL  ·  CLEAR"
           className="h-full min-w-0 flex-1 bg-transparent font-mono text-xs text-fg outline-none placeholder:text-subtle"
           autoCapitalize="off"
           autoComplete="off"

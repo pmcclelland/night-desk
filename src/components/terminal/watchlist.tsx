@@ -3,7 +3,7 @@ import { pct, px, signClass, vol } from "@/lib/format";
 import { normalizeSymbol } from "@/lib/universe";
 import { useDesk } from "@/lib/store";
 import { refreshQuotes } from "@/lib/sync";
-import { queuePersist } from "@/lib/desk-sync";
+import { queuePersist, selectSymbol } from "@/lib/desk-sync";
 import { Panel } from "@/components/terminal/panel";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,6 @@ export function Watchlist() {
   const watchlist = useDesk((s) => s.watchlist);
   const quotes = useDesk((s) => s.quotes);
   const selected = useDesk((s) => s.selected);
-  const setSelected = useDesk((s) => s.setSelected);
   const addWatch = useDesk((s) => s.addWatch);
   const rmWatch = useDesk((s) => s.rmWatch);
   const [draft, setDraft] = useState("");
@@ -22,7 +21,7 @@ export function Watchlist() {
     const s = normalizeSymbol(draft);
     if (!s) return;
     addWatch(s);
-    setSelected(s);
+    selectSymbol(s);
     setDraft("");
     void refreshQuotes();
     queuePersist();
@@ -70,7 +69,7 @@ export function Watchlist() {
                   "cursor-pointer border-t border-border/60 hover:bg-elevated",
                   selected === sym && "bg-elevated",
                 )}
-                onClick={() => setSelected(sym)}
+                onClick={() => selectSymbol(sym)}
               >
                 <td className="px-2 py-1.5">
                   <div className="flex items-center gap-1.5">

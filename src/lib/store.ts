@@ -65,6 +65,7 @@ export interface DeskState {
   alpacaOrders: Order[];
   strategies: StrategyInstance[];
   botLog: BotLine[];
+  botLogClearedAt: number;
   risk: RiskSettings;
   halted: boolean;
   settingsOpen: boolean;
@@ -87,6 +88,7 @@ export interface DeskState {
   addWatch: (s: string) => void;
   rmWatch: (s: string) => void;
   log: (kind: BotLine["kind"], text: string) => void;
+  clearBotLog: () => void;
   setHalted: (v: boolean) => void;
   setRisk: (r: Partial<RiskSettings>) => void;
   setSettingsOpen: (v: boolean) => void;
@@ -102,6 +104,7 @@ export interface DeskState {
     sim: SimBook;
     strategies: StrategyInstance[];
     botLog: BotLine[];
+    botLogClearedAt?: number;
     risk: RiskSettings;
     halted: boolean;
     creds: { keyId: string; secret: string } | null;
@@ -142,6 +145,7 @@ export const useDesk = create<DeskState>()(
       alpacaOrders: [],
       strategies: defaultStrategies(),
       botLog: [],
+      botLogClearedAt: 0,
       risk: { maxDailyLossPct: 2, maxPositionPct: 15, defaultQty: 10 },
       halted: false,
       settingsOpen: false,
@@ -174,6 +178,7 @@ export const useDesk = create<DeskState>()(
       },
       rmWatch: (s) => set({ watchlist: get().watchlist.filter((x) => x !== s) }),
       log: (kind, text) => set({ botLog: [...get().botLog, line(kind, text)].slice(-200) }),
+      clearBotLog: () => set({ botLog: [], botLogClearedAt: Date.now() }),
       setHalted: (v) => set({ halted: v }),
       setRisk: (r) => set({ risk: { ...get().risk, ...r } }),
       setSettingsOpen: (v) => set({ settingsOpen: v }),
@@ -200,6 +205,7 @@ export const useDesk = create<DeskState>()(
           sim: d.sim,
           strategies: d.strategies,
           botLog: d.botLog,
+          botLogClearedAt: d.botLogClearedAt ?? get().botLogClearedAt,
           risk: d.risk,
           halted: d.halted,
           creds: d.creds?.keyId
@@ -222,6 +228,7 @@ export const useDesk = create<DeskState>()(
         sim: s.sim,
         strategies: s.strategies,
         botLog: s.botLog.slice(-80),
+        botLogClearedAt: s.botLogClearedAt,
         risk: s.risk,
         halted: s.halted,
       }),

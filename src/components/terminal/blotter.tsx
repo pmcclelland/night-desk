@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { pct, px, qty, signClass, signedMoney } from "@/lib/format";
-import { useDesk, useLiveBook } from "@/lib/store";
+import { selectSymbol } from "@/lib/desk-sync";
+import { useLiveBook } from "@/lib/store";
 import { cancelOrder, flatten } from "@/lib/sync";
 import { Panel } from "@/components/terminal/panel";
 import { Button } from "@/components/ui/button";
@@ -11,7 +12,7 @@ type BookTab = "pos" | "ord";
 export function Blotter() {
   const [tab, setTab] = useState<BookTab>("pos");
   const { positions, orders } = useLiveBook();
-  const setSelected = useDesk((s) => s.setSelected);
+
   const working = orders.filter((o) =>
     ["new", "accepted", "partially_filled"].includes(o.status),
   );
@@ -57,7 +58,7 @@ export function Blotter() {
                 <tr
                   key={p.symbol}
                   className="cursor-pointer border-t border-border/60 hover:bg-elevated"
-                  onClick={() => setSelected(p.symbol)}
+                  onClick={() => selectSymbol(p.symbol)}
                 >
                   <td className="px-2 py-1.5 text-fg">{p.symbol}</td>
                   <td className="px-2 py-1.5 text-right">{qty(p.qty)}</td>

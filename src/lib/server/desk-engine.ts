@@ -7,7 +7,7 @@ import {
   snapshotAlpaca,
   submitAlpacaOrderInner,
 } from "@/lib/server/alpaca";
-import { mergeBotLogs } from "@/lib/bot-log";
+import { mergeBotTapes } from "@/lib/bot-log";
 import { loadBars, loadQuotes } from "@/lib/server/market";
 import { loadDesk, saveDesk, type DeskSnapshot } from "@/lib/server/desk-store";
 import { localThesis } from "@/lib/indicators";
@@ -117,6 +117,7 @@ export type DeskOp =
   | { op: "thesis"; symbol?: string }
   | { op: "bot_log"; limit?: number }
   | { op: "bot_say"; text: string }
+  | { op: "bot_clear" }
   | { op: "save_client"; snapshot: Omit<DeskSnapshot, "updatedAt" | "creds"> & { creds?: { keyId: string } | null } };
 
 export type DeskOpExtra = {
@@ -296,6 +297,11 @@ async function runOp(desk: DeskSnapshot, op: DeskOp): Promise<DeskOpResult> {
     return { ok: true, message: text, desk: next };
   }
 
+  if (op.op === "bot_clear") {
+    const next: DeskSnapshot = { ...desk, botLog: [], botLogClearedAt: Date.now() };
+    return { ok: true, message: "BOT cleared", desk: next };
+  }
+
   if (op.op === "thesis") {
     const symbol = (op.symbol || desk.selected).toUpperCase();
     const pack = await quotesFor(desk);
@@ -399,6 +405,10 @@ async function runOp(desk: DeskSnapshot, op: DeskOp): Promise<DeskOpResult> {
   }
 
   if (op.op === "save_client") {
+    const tape = mergeBotTapes(
+      { lines: desk.botLog, clearedAt: desk.botLogClearedAt },
+      { lines: op.snapshot.botLog, clearedAt: op.snapshot.botLogClearedAt ?? 0 },
+    );
     const next: DeskSnapshot = {
       ...desk,
       venue: op.snapshot.venue,
@@ -406,7 +416,8 @@ async function runOp(desk: DeskSnapshot, op: DeskOp): Promise<DeskOpResult> {
       selected: op.snapshot.selected,
       sim: op.snapshot.sim,
       strategies: op.snapshot.strategies,
-      botLog: mergeBotLogs(desk.botLog, op.snapshot.botLog),
+      botLog: tape.lines,
+      botLogClearedAt: tape.clearedAt,
       risk: op.snapshot.risk,
       halted: op.snapshot.halted,
       creds: desk.creds,
