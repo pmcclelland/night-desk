@@ -189,26 +189,32 @@ async function alpacaQuotes(symbols: string[], creds: Creds, now: number): Promi
   }
 }
 
+export async function loadQuotes(data: {
+  symbols: string[];
+  venue: Venue;
+  creds?: Creds | null;
+}): Promise<{ quotes: Record<string, Quote>; source: TapeSource }> {
+  const now = Date.now();
+  const symbols = data.symbols.map((s) => s.toUpperCase()).filter(Boolean);
+  if (symbols.length === 0) return { quotes: {}, source: "seed" };
+  if ((data.venue === "alpaca-paper" || data.venue === "alpaca-live") && data.creds) {
+    const live = await alpacaQuotes(symbols, data.creds, now);
+    if (live) {
+      const missing = symbols.filter((s) => !live[s]);
+      if (missing.length) {
+        const y = await yahooQuotes(missing, now);
+        return { quotes: { ...y.quotes, ...live }, source: "mixed" };
+      }
+      return { quotes: live, source: "alpaca" };
+    }
+  }
+  const y = await yahooQuotes(symbols, now);
+  return { quotes: y.quotes, source: y.hit ? "yahoo" : "seed" };
+}
+
 export const fetchQuotes = createServerFn({ method: "POST" })
   .validator((input: { symbols: string[]; venue: Venue; creds?: Creds | null }) => input)
-  .handler(async ({ data }): Promise<{ quotes: Record<string, Quote>; source: TapeSource }> => {
-    const now = Date.now();
-    const symbols = data.symbols.map((s) => s.toUpperCase()).filter(Boolean);
-    if (symbols.length === 0) return { quotes: {}, source: "seed" };
-    if ((data.venue === "alpaca-paper" || data.venue === "alpaca-live") && data.creds) {
-      const live = await alpacaQuotes(symbols, data.creds, now);
-      if (live) {
-        const missing = symbols.filter((s) => !live[s]);
-        if (missing.length) {
-          const y = await yahooQuotes(missing, now);
-          return { quotes: { ...y.quotes, ...live }, source: "mixed" };
-        }
-        return { quotes: live, source: "alpaca" };
-      }
-    }
-    const y = await yahooQuotes(symbols, now);
-    return { quotes: y.quotes, source: y.hit ? "yahoo" : "seed" };
-  });
+  .handler(async ({ data }) => loadQuotes(data));
 
 interface YahooChart {
   chart?: {
@@ -300,19 +306,26 @@ async function alpacaBars(symbol: string, range: BarRange, creds: Creds): Promis
   }
 }
 
+export async function loadBars(data: {
+  symbol: string;
+  range: BarRange;
+  venue: Venue;
+  creds?: Creds | null;
+}): Promise<{ bars: Bar[]; source: BarSource }> {
+  const symbol = data.symbol.toUpperCase();
+  if ((data.venue === "alpaca-paper" || data.venue === "alpaca-live") && data.creds) {
+    const live = await alpacaBars(symbol, data.range, data.creds);
+    if (live) return { bars: live, source: "alpaca" };
+  }
+  try {
+    const bars = await yahooBars(symbol, data.range);
+    if (bars.length) return { bars, source: "yahoo" };
+  } catch {
+    /* seed */
+  }
+  return { bars: syntheticBars(symbol, data.range, Date.now()), source: "seed" };
+}
+
 export const fetchBars = createServerFn({ method: "POST" })
   .validator((input: { symbol: string; range: BarRange; venue: Venue; creds?: Creds | null }) => input)
-  .handler(async ({ data }): Promise<{ bars: Bar[]; source: BarSource }> => {
-    const symbol = data.symbol.toUpperCase();
-    if ((data.venue === "alpaca-paper" || data.venue === "alpaca-live") && data.creds) {
-      const live = await alpacaBars(symbol, data.range, data.creds);
-      if (live) return { bars: live, source: "alpaca" };
-    }
-    try {
-      const bars = await yahooBars(symbol, data.range);
-      if (bars.length) return { bars, source: "yahoo" };
-    } catch {
-      /* seed */
-    }
-    return { bars: syntheticBars(symbol, data.range, Date.now()), source: "seed" };
-  });
+  .handler(async ({ data }) => loadBars(data));

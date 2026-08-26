@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { backtest, KIND_META } from "@/lib/strategies";
 import { pct, signClass } from "@/lib/format";
 import { useDesk } from "@/lib/store";
+import { queuePersist } from "@/lib/desk-sync";
 import type { Bar, StrategyInstance } from "@/lib/types";
 import { Panel } from "@/components/terminal/panel";
 import { Button } from "@/components/ui/button";
@@ -43,7 +44,10 @@ function StrategyRow({ st, bars }: { st: StrategyInstance; bars: Bar[] }) {
         <Button
           size="sm"
           variant={st.armed ? "buy" : "outline"}
-          onClick={() => patch(st.id, { armed: !st.armed, lastFiredAt: 0 })}
+          onClick={() => {
+            patch(st.id, { armed: !st.armed, lastFiredAt: 0 });
+            queuePersist();
+          }}
         >
           {st.armed ? "Armed" : "Arm"}
         </Button>

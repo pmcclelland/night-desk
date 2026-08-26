@@ -4,6 +4,8 @@ import { getMarketClock } from "@/lib/market-hours";
 import { useNow } from "@/lib/hooks";
 import { useDesk, useLiveBook } from "@/lib/store";
 import { killSwitch } from "@/lib/sync";
+import { signOut } from "@/lib/auth/client";
+import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import type { TapeSource } from "@/lib/types";
@@ -137,8 +139,28 @@ export function HeaderBar() {
         >
           <Settings className="size-4" />
         </Button>
+        <OperatorChip />
       </div>
     </header>
+  );
+}
+
+function OperatorChip() {
+  const { user, isPending } = useCurrentUserState();
+  if (isPending) {
+    return <span className="hidden h-7 w-16 animate-pulse bg-elevated md:inline-block" />;
+  }
+  if (!user) return null;
+  const label = user.displayName ?? user.primaryEmail ?? "Op";
+  return (
+    <button
+      type="button"
+      onClick={() => void signOut()}
+      title="Sign out"
+      className="hidden max-w-28 truncate font-mono text-micro tracking-widest text-muted uppercase hover:text-fg md:inline"
+    >
+      {label}
+    </button>
   );
 }
 

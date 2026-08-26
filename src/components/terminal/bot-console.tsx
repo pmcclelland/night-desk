@@ -71,7 +71,7 @@ export function BotConsole() {
           ref={input}
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="BUY 10 NVDA  ·  THESIS AAPL  ·  HALT"
+          placeholder="BUY 10 NVDA  ·  what’s my risk if I buy 5 NVDA"
           className="h-full min-w-0 flex-1 bg-transparent font-mono text-xs text-fg outline-none placeholder:text-subtle"
           autoCapitalize="off"
           autoComplete="off"

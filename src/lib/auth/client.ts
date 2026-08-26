@@ -153,6 +153,37 @@ export async function signIn(
 }
 
 /**
+ * Native Google OAuth (this app's Better Auth, not the Grok broker).
+ * Used on nightdesk.pmcclel.land. Live preview still uses the broker popup.
+ */
+export async function signInWithGoogle(
+  opts: { callbackURL?: string; errorCallbackURL?: string } = {},
+): Promise<void> {
+  if (inLivePreview()) {
+    await signIn("grok-google", opts);
+    return;
+  }
+
+  const callbackURL = opts.callbackURL ?? "/";
+  const errorCallbackURL = opts.errorCallbackURL ?? "/login";
+
+  await runPreSignInSignOut({
+    livePreview: false,
+    hasBearer: Boolean(getBearerToken()),
+    requestSignOut: () => authClient.signOut(),
+    clearToken: () => setBearerToken(null),
+  });
+
+  const { data, error } = await authClient.signIn.social({
+    provider: "google",
+    callbackURL,
+    errorCallbackURL,
+  });
+  if (error) throw new Error(error.message ?? "Google sign-in failed");
+  if (data?.url) window.location.href = data.url;
+}
+
+/**
  * Open `/auth/popup` in a new window. Must run synchronously inside the click
  * handler (no await before this). The path is served by the template Vite
  * plugin (`authPopupPlugin` in vite.config.ts) — NOT by a React route.

@@ -21,7 +21,8 @@ import {
   pingAlpaca,
   submitAlpacaOrder,
 } from "@/lib/server/trade";
-import { askDesk } from "@/lib/server/grok";
+import { askDeskAgent, runDeskOp } from "@/lib/server/desk-api";
+import { applyPulledDesk, queuePersist } from "@/lib/desk-sync";
 import { selectAccount, selectPositions, useDesk } from "@/lib/store";
 import type { OrderRequest, Venue } from "@/lib/types";
 
@@ -57,6 +58,7 @@ export async function refreshQuotes() {
         );
         toast.success(`Filled ${f.side} ${f.qty} ${f.symbol}`);
       }
+      if (matched.fills.length) queuePersist();
     }
   } catch (err) {
     useDesk.getState().log("err", err instanceof Error ? err.message : "Quote feed failed");
@@ -139,6 +141,7 @@ export async function placeOrder(req: OrderRequest): Promise<{ ok: boolean; erro
     s.log(o.status === "filled" ? "fill" : "sys", fillNote);
     if (o.status === "filled") toast.success(fillNote);
     riskHaltIfNeeded();
+    queuePersist();
     return { ok: true };
   }
 
@@ -166,6 +169,7 @@ export async function placeOrder(req: OrderRequest): Promise<{ ok: boolean; erro
   }
   s.log("sys", `ACK ${res.order.side.toUpperCase()} ${res.order.qty} ${res.order.symbol}`);
   await refreshAlpaca();
+  queuePersist();
   return { ok: true };
 }
 
@@ -174,6 +178,7 @@ export async function cancelOrder(id: string) {
   if (s.venue === "sim") {
     s.setSim(cancelSimOrder(s.sim, id));
     s.log("sys", `Canceled ${id}`);
+    queuePersist();
     return;
   }
   if (!s.creds) return;
@@ -181,6 +186,7 @@ export async function cancelOrder(id: string) {
   if (!res.ok) s.log("err", res.error);
   else s.log("sys", `Canceled ${id}`);
   await refreshAlpaca();
+  queuePersist();
 }
 
 export async function killSwitch(flattenBook: boolean) {
@@ -203,6 +209,7 @@ export async function killSwitch(flattenBook: boolean) {
       : "KILL — canceled working, strategies disarmed",
   );
   toast.error("Kill switch engaged");
+  queuePersist();
 }
 
 export async function flatten(symbol?: string) {
@@ -212,12 +219,14 @@ export async function flatten(symbol?: string) {
       const r = flattenAll(s.sim, s.quotes, "bot");
       s.setSim(r.book);
       s.log("fill", `Flattened ${r.orders.length} names`);
+      queuePersist();
       return;
     }
     const r = flattenSymbol(s.sim, s.quotes, symbol, "bot");
     s.setSim(r.book);
     if (r.error) s.log("err", r.error);
     else s.log("fill", `Flattened ${symbol}`);
+    queuePersist();
     return;
   }
   if (!s.creds) return;
@@ -231,6 +240,7 @@ export async function flatten(symbol?: string) {
     else s.log("sys", `Flattened ${symbol}`);
   }
   await refreshAlpaca();
+  queuePersist();
 }
 
 export async function connectAlpaca(venue: Venue, keyId: string, secret: string) {
@@ -240,6 +250,8 @@ export async function connectAlpaca(venue: Venue, keyId: string, secret: string)
     s.setCreds(null);
     s.setConnected(true);
     s.log("sys", "Venue SIM — local blotter, Yahoo delayed tape.");
+    void runDeskOp({ data: { op: "set_venue", venue: "sim" } }).catch(() => undefined);
+    queuePersist();
     return { ok: true as const };
   }
   const creds = { keyId: keyId.trim(), secret: secret.trim() };
@@ -260,6 +272,10 @@ export async function connectAlpaca(venue: Venue, keyId: string, secret: string)
   );
   await refreshAlpaca();
   await refreshQuotes();
+  void runDeskOp({
+    data: { op: "set_venue", venue, keyId: creds.keyId, secret: creds.secret },
+  }).catch(() => undefined);
+  queuePersist();
   return { ok: true as const };
 }
 
@@ -306,47 +322,6 @@ export async function tickStrategies() {
   }
 }
 
-async function runGrokCommands(
-  commands: Array<{
-    op: string;
-    symbol?: string;
-    qty?: number;
-    type?: "market" | "limit" | "stop";
-    limitPrice?: number;
-    stopPrice?: number;
-  }>,
-) {
-  for (const c of commands) {
-    if (c.op === "buy" || c.op === "sell") {
-      if (!c.symbol || !c.qty) continue;
-      await placeOrder({
-        symbol: c.symbol.toUpperCase(),
-        side: c.op,
-        type: c.type ?? "market",
-        qty: c.qty,
-        tif: "day",
-        limitPrice: c.limitPrice,
-        stopPrice: c.stopPrice,
-        source: "bot",
-      });
-    } else if (c.op === "flatten") {
-      await flatten(c.symbol?.toUpperCase());
-    } else if (c.op === "cancel_all") {
-      const st = useDesk.getState();
-      if (st.venue === "sim") st.setSim(cancelAllSim(st.sim));
-      else if (st.creds) await cancelAllAlpaca({ data: { venue: st.venue, creds: st.creds } });
-      st.log("sys", "Canceled working orders");
-    } else if (c.op === "halt") {
-      await killSwitch(false);
-    } else if (c.op === "resume") {
-      useDesk.getState().setHalted(false);
-      useDesk.getState().log("sys", "Desk resumed");
-    } else if (c.op === "thesis" && c.symbol) {
-      await runThesis(c.symbol.toUpperCase());
-    }
-  }
-}
-
 export async function runThesis(symbol: string) {
   const s = useDesk.getState();
   const last = s.quotes[symbol]?.last ?? 0;
@@ -359,18 +334,14 @@ export async function runThesis(symbol: string) {
   }
   const local = localThesis(symbol, last || bars.at(-1)?.c || 0, bars);
   s.log("ai", local);
-  const grok = await askDesk({
+  const grok = await askDeskAgent({
     data: {
-      text: `Write a 3-sentence trade thesis for ${symbol}. Last ${last}. Be specific, no hype.`,
-      selected: symbol,
-      last,
-      equity: selectAccount(s).equity,
-      positions: selectPositions(s)
-        .map((p) => `${p.symbol}:${p.qty}`)
-        .join(","),
+      text: `Write a 3-sentence trade thesis for ${symbol}. Last ${last}. Be specific, no hype. Do not trade.`,
     },
   });
   if (grok.ok && grok.say) s.log("ai", grok.say);
+  if (grok.ok && "desk" in grok && grok.desk) applyPulledDesk(grok.desk);
+  else queuePersist();
 }
 
 export async function runConsole(raw: string) {
@@ -409,6 +380,7 @@ export async function runConsole(raw: string) {
   if (cmd.op === "resume") {
     s.setHalted(false);
     s.log("sys", "Desk resumed");
+    queuePersist();
     return;
   }
   if (cmd.op === "flatten") {
@@ -419,6 +391,7 @@ export async function runConsole(raw: string) {
     if (s.venue === "sim") s.setSim(cancelAllSim(s.sim));
     else if (s.creds) await cancelAllAlpaca({ data: { venue: s.venue, creds: s.creds } });
     s.log("sys", "Canceled working");
+    queuePersist();
     return;
   }
   if (cmd.op === "thesis") {
@@ -431,6 +404,7 @@ export async function runConsole(raw: string) {
     else s.rmWatch(cmd.symbol);
     s.log("sys", `Watchlist ${cmd.action} ${cmd.symbol}`);
     await refreshQuotes();
+    queuePersist();
     return;
   }
   if (cmd.op === "arm" || cmd.op === "disarm") {
@@ -441,11 +415,13 @@ export async function runConsole(raw: string) {
     }
     s.patchStrategy(st.id, { armed: cmd.op === "arm" });
     s.log("sys", `${cmd.op.toUpperCase()} ${st.name}`);
+    queuePersist();
     return;
   }
   if (cmd.op === "select") {
     s.setSelected(cmd.symbol);
     if (!s.watchlist.includes(cmd.symbol)) s.addWatch(cmd.symbol);
+    queuePersist();
     return;
   }
   if (cmd.op === "order") {
@@ -453,22 +429,12 @@ export async function runConsole(raw: string) {
     return;
   }
   if (cmd.op === "ask") {
-    const grok = await askDesk({
-      data: {
-        text: cmd.text,
-        selected: s.selected,
-        last,
-        equity: selectAccount(s).equity,
-        positions: selectPositions(s)
-          .map((p) => `${p.symbol}:${p.qty}`)
-          .join(","),
-      },
-    });
+    const grok = await askDeskAgent({ data: { text: cmd.text } });
     if (!grok.ok) {
       s.log("err", grok.error + " — use HELP for the command language.");
       return;
     }
     if (grok.say) s.log("ai", grok.say);
-    if (grok.commands.length) await runGrokCommands(grok.commands);
+    if ("desk" in grok && grok.desk) applyPulledDesk(grok.desk);
   }
 }

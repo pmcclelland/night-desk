@@ -28,7 +28,7 @@ const HELP = `Commands
   THESIS NVDA
   WATCH ADD AMD | WATCH RM AMD
   HALT | RESUME | STATUS | HELP
-Natural language is sent to Grok when it does not match a command.`;
+Anything else is handled by the desk agent (Grok), which can also trade.`;
 
 export function helpText() {
   return HELP;

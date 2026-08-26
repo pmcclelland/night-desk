@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useDesk } from "@/lib/store";
 import { connectAlpaca } from "@/lib/sync";
+import { queuePersist } from "@/lib/desk-sync";
+import { listDeskTokens, mintDeskToken, revokeDeskToken } from "@/lib/server/desk-api";
 import type { TapeSource, Venue } from "@/lib/types";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -52,10 +54,10 @@ export function SettingsDialog() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="w-[min(92vw,480px)]">
+      <DialogContent className="max-h-[min(92dvh,720px)] w-[min(92vw,480px)] overflow-y-auto">
         <DialogTitle>Desk settings</DialogTitle>
         <DialogDescription>
-          Keys stay in this browser and are sent only to Alpaca via the app proxy. Never stored on the server.
+          Alpaca keys are encrypted on the operator desk so a Grok Bot can trade through MCP. SIM needs no keys.
         </DialogDescription>
 
         <div className="mt-4 space-y-2">
@@ -118,7 +120,10 @@ export function SettingsDialog() {
             Max day loss %
             <Input
               value={String(risk.maxDailyLossPct)}
-              onChange={(e) => setRisk({ maxDailyLossPct: Number(e.target.value) || 0 })}
+              onChange={(e) => {
+                setRisk({ maxDailyLossPct: Number(e.target.value) || 0 });
+                queuePersist();
+              }}
               className="mt-1"
               inputMode="decimal"
             />
@@ -127,7 +132,10 @@ export function SettingsDialog() {
             Max pos %
             <Input
               value={String(risk.maxPositionPct)}
-              onChange={(e) => setRisk({ maxPositionPct: Number(e.target.value) || 0 })}
+              onChange={(e) => {
+                setRisk({ maxPositionPct: Number(e.target.value) || 0 });
+                queuePersist();
+              }}
               className="mt-1"
               inputMode="decimal"
             />
@@ -149,12 +157,98 @@ export function SettingsDialog() {
               resetSim();
               setDraftVenue("sim");
               setMsg("Sim book reset to $100,000.");
+              queuePersist();
             }}
           >
             Reset SIM
           </Button>
         </div>
+
+        <McpPanel open={open} />
       </DialogContent>
     </Dialog>
+  );
+}
+
+type TokenRow = { id: string; name: string; tokenPrefix: string; createdAt: string };
+
+function McpPanel({ open }: { open: boolean }) {
+  const [tokens, setTokens] = useState<TokenRow[]>([]);
+  const [revealed, setRevealed] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+
+  useEffect(() => {
+    if (!open) return;
+    void listDeskTokens()
+      .then(setTokens)
+      .catch(() => setTokens([]));
+  }, [open]);
+
+  async function mint() {
+    setBusy(true);
+    setError(null);
+    try {
+      const row = await mintDeskToken({ data: { name: "Grok Bot" } });
+      setTokens((t) => [
+        { id: row.id, name: row.name, tokenPrefix: row.tokenPrefix, createdAt: row.createdAt },
+        ...t,
+      ]);
+      setRevealed(row.token ?? null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not mint token");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function revoke(id: string) {
+    setBusy(true);
+    try {
+      await revokeDeskToken({ data: { id } });
+      setTokens((t) => t.filter((x) => x.id !== id));
+      setRevealed(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Revoke failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-6 border-t border-border pt-4">
+      <p className="font-mono text-micro tracking-widest text-subtle uppercase">Grok Bot MCP</p>
+      <p className="mt-1 font-mono text-2xs leading-relaxed text-muted">
+        Point a Grok custom bot at this MCP with a bearer token. Tools can place orders, flatten,
+        halt, and answer freeform desk questions.
+      </p>
+      <p className="mt-2 break-all font-mono text-2xs text-fg">{origin}/api/mcp</p>
+      {revealed ? (
+        <p className="mt-2 break-all border border-accent/40 bg-elevated px-2 py-2 font-mono text-2xs text-accent">
+          {revealed}
+          <span className="mt-1 block text-muted">Shown once. Store it on the bot, then close this.</span>
+        </p>
+      ) : null}
+      {error ? <p className="mt-2 font-mono text-2xs text-down">{error}</p> : null}
+      <div className="mt-3 space-y-1">
+        {tokens.map((t) => (
+          <div key={t.id} className="flex items-center justify-between gap-2 border border-border px-2 py-1.5">
+            <span className="truncate font-mono text-2xs text-muted">{t.tokenPrefix}</span>
+            <button
+              type="button"
+              className="font-mono text-micro tracking-widest text-down uppercase"
+              onClick={() => void revoke(t.id)}
+              disabled={busy}
+            >
+              Revoke
+            </button>
+          </div>
+        ))}
+      </div>
+      <Button variant="outline" size="sm" className="mt-3" disabled={busy} onClick={() => void mint()}>
+        {busy ? "Minting…" : "Mint bot token"}
+      </Button>
+    </div>
   );
 }

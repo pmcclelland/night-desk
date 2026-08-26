@@ -3,6 +3,7 @@ import { pct, px, signClass, vol } from "@/lib/format";
 import { normalizeSymbol } from "@/lib/universe";
 import { useDesk } from "@/lib/store";
 import { refreshQuotes } from "@/lib/sync";
+import { queuePersist } from "@/lib/desk-sync";
 import { Panel } from "@/components/terminal/panel";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,7 @@ export function Watchlist() {
     setSelected(s);
     setDraft("");
     void refreshQuotes();
+    queuePersist();
   }
 
   return (
@@ -80,6 +82,7 @@ export function Watchlist() {
                       onClick={(e) => {
                         e.stopPropagation();
                         rmWatch(sym);
+                        queuePersist();
                       }}
                     >
                       ×

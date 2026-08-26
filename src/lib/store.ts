@@ -95,6 +95,18 @@ export interface DeskState {
   setChartFocus: (v: boolean) => void;
   toggleChartFocus: () => void;
   resetSim: () => void;
+  applyServerDesk: (d: {
+    venue: Venue;
+    watchlist: string[];
+    selected: string;
+    sim: SimBook;
+    strategies: StrategyInstance[];
+    botLog: BotLine[];
+    risk: RiskSettings;
+    halted: boolean;
+    creds: { keyId: string; secret: string } | null;
+    hasSecret?: boolean;
+  }) => void;
 }
 
 function line(kind: BotLine["kind"], text: string): BotLine {
@@ -177,6 +189,27 @@ export const useDesk = create<DeskState>()(
           connected: true,
           connectError: null,
         }),
+      applyServerDesk: (d) => {
+        const current = get().creds;
+        const keepSecret =
+          d.creds?.keyId && current?.keyId === d.creds.keyId ? current.secret : current?.secret ?? "";
+        set({
+          venue: d.venue,
+          watchlist: d.watchlist,
+          selected: d.selected,
+          sim: d.sim,
+          strategies: d.strategies,
+          botLog: d.botLog,
+          risk: d.risk,
+          halted: d.halted,
+          creds: d.creds?.keyId
+            ? { keyId: d.creds.keyId, secret: keepSecret }
+            : d.hasSecret
+              ? current
+              : null,
+          connected: d.venue === "sim" || Boolean(d.creds?.keyId || d.hasSecret || current?.secret),
+        });
+      },
     }),
     {
       name: "nightdesk.v1",

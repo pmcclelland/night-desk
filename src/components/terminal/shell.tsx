@@ -13,6 +13,7 @@ import { SettingsDialog } from "@/components/terminal/settings-dialog";
 import { useIsDesktop } from "@/lib/hooks";
 import { useDesk, type MobileTab } from "@/lib/store";
 import { refreshAlpaca, refreshBars, refreshQuotes, tickStrategies } from "@/lib/sync";
+import { hydrateDesk } from "@/lib/desk-sync";
 import {
   exitNativeFullscreen,
   isNativeFullscreen,
@@ -49,11 +50,13 @@ export function TerminalShell() {
   useEffect(() => {
     const s = useDesk.getState();
     if (s.botLog.length === 0) {
-      s.log("sys", "NIGHTDESK online. Venue SIM. Type HELP or BUY 10 AAPL.");
+      s.log("sys", "NIGHTDESK online. Venue SIM. Type HELP or ask the desk in English.");
     }
-    void refreshQuotes();
-    void refreshBars();
-    if (s.venue !== "sim" && s.creds) void refreshAlpaca();
+    void hydrateDesk().then(() => {
+      void refreshQuotes();
+      void refreshBars();
+      if (useDesk.getState().venue !== "sim" && useDesk.getState().creds) void refreshAlpaca();
+    });
   }, []);
 
   useEffect(() => {
@@ -66,10 +69,12 @@ export function TerminalShell() {
       if (useDesk.getState().venue !== "sim") void refreshAlpaca();
     }, 15000);
     const s = window.setInterval(() => void tickStrategies(), 20000);
+    const p = window.setInterval(() => void hydrateDesk(), 12000);
     return () => {
       window.clearInterval(q);
       window.clearInterval(a);
       window.clearInterval(s);
+      window.clearInterval(p);
     };
   }, [venue]);
 

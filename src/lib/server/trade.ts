@@ -1,179 +1,23 @@
 import { createServerFn } from "@tanstack/react-start";
-import type { Account, Creds, EquityPoint, Order, Position, Venue } from "@/lib/types";
-
-function host(venue: Venue) {
-  return venue === "alpaca-live" ? "https://api.alpaca.markets" : "https://paper-api.alpaca.markets";
-}
-
-function headers(creds: Creds) {
-  return {
-    "APCA-API-KEY-ID": creds.keyId,
-    "APCA-API-SECRET-KEY": creds.secret,
-    Accept: "application/json",
-    "Content-Type": "application/json",
-  };
-}
-
-async function alpaca<T>(venue: Venue, creds: Creds, path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${host(venue)}${path}`, {
-    ...init,
-    headers: { ...headers(creds), ...(init?.headers as Record<string, string> | undefined) },
-  });
-  const text = await res.text();
-  if (!res.ok) {
-    let msg = `Alpaca ${res.status}`;
-    try {
-      const j = JSON.parse(text) as { message?: string };
-      if (j.message) msg = j.message;
-    } catch {
-      if (text) msg = text.slice(0, 180);
-    }
-    throw new Error(msg);
-  }
-  if (!text) return {} as T;
-  return JSON.parse(text) as T;
-}
-
-interface AlpacaAccount {
-  cash: string;
-  equity: string;
-  buying_power: string;
-  last_equity: string;
-  long_market_value: string;
-  short_market_value: string;
-  status: string;
-  pattern_day_trader: boolean;
-  daytrade_count: number;
-  trading_blocked: boolean;
-}
-
-interface AlpacaPosition {
-  symbol: string;
-  qty: string;
-  avg_entry_price: string;
-  current_price: string;
-  market_value: string;
-  cost_basis: string;
-  unrealized_pl: string;
-  unrealized_plpc: string;
-  unrealized_intraday_pl: string;
-}
-
-interface AlpacaOrder {
-  id: string;
-  client_order_id: string;
-  symbol: string;
-  side: "buy" | "sell";
-  type: string;
-  qty: string;
-  filled_qty: string;
-  limit_price: string | null;
-  stop_price: string | null;
-  time_in_force: string;
-  status: string;
-  submitted_at: string;
-  filled_at: string | null;
-  filled_avg_price: string | null;
-}
-
-function mapAccount(a: AlpacaAccount): Account {
-  const equity = Number(a.equity);
-  const lastEquity = Number(a.last_equity);
-  const dayPl = equity - lastEquity;
-  return {
-    cash: Number(a.cash),
-    equity,
-    buyingPower: Number(a.buying_power),
-    lastEquity,
-    longValue: Number(a.long_market_value),
-    shortValue: Number(a.short_market_value),
-    dayPl,
-    dayPlPct: lastEquity ? (dayPl / lastEquity) * 100 : 0,
-    realizedToday: 0,
-    status: a.status,
-    patternDayTrader: a.pattern_day_trader,
-    daytradeCount: a.daytrade_count,
-    tradingBlocked: a.trading_blocked,
-  };
-}
-
-function mapPosition(p: AlpacaPosition): Position {
-  const qty = Number(p.qty);
-  const last = Number(p.current_price);
-  const avg = Number(p.avg_entry_price);
-  return {
-    symbol: p.symbol,
-    qty,
-    avgPrice: avg,
-    last,
-    marketValue: Number(p.market_value),
-    costBasis: Number(p.cost_basis),
-    unrealizedPl: Number(p.unrealized_pl),
-    unrealizedPlPct: Number(p.unrealized_plpc) * 100,
-    dayPl: Number(p.unrealized_intraday_pl),
-  };
-}
-
-function mapOrder(o: AlpacaOrder): Order {
-  const type = o.type === "limit" || o.type === "stop" || o.type === "market" ? o.type : "market";
-  const tif = o.time_in_force === "gtc" || o.time_in_force === "ioc" ? o.time_in_force : "day";
-  const status = (
-    ["new", "accepted", "partially_filled", "filled", "canceled", "rejected", "expired"] as const
-  ).includes(o.status as Order["status"])
-    ? (o.status as Order["status"])
-    : o.status === "pending_new" || o.status === "held"
-      ? "accepted"
-      : o.status === "done_for_day"
-        ? "expired"
-        : "new";
-  return {
-    id: o.id,
-    clientOrderId: o.client_order_id,
-    symbol: o.symbol,
-    side: o.side,
-    type,
-    qty: Number(o.qty),
-    filledQty: Number(o.filled_qty),
-    limitPrice: o.limit_price ? Number(o.limit_price) : undefined,
-    stopPrice: o.stop_price ? Number(o.stop_price) : undefined,
-    tif,
-    status,
-    submittedAt: Date.parse(o.submitted_at),
-    filledAt: o.filled_at ? Date.parse(o.filled_at) : undefined,
-    filledAvgPrice: o.filled_avg_price ? Number(o.filled_avg_price) : undefined,
-    source: "manual",
-  };
-}
+import type { Creds, EquityPoint, Venue } from "@/lib/types";
+import {
+  cancelAllAlpacaInner,
+  cancelAlpacaOrderInner,
+  closeAllAlpacaInner,
+  closeAlpacaPositionInner,
+  fetchEquityHistoryInner,
+  pingAlpacaAccount,
+  snapshotAlpaca,
+  submitAlpacaOrderInner,
+} from "@/lib/server/alpaca";
 
 export const pingAlpaca = createServerFn({ method: "POST" })
   .validator((input: { venue: Venue; creds: Creds }) => input)
-  .handler(async ({ data }) => {
-    try {
-      const a = await alpaca<AlpacaAccount>(data.venue, data.creds, "/v2/account");
-      return { ok: true as const, account: mapAccount(a) };
-    } catch (err) {
-      return { ok: false as const, error: err instanceof Error ? err.message : "Connect failed" };
-    }
-  });
+  .handler(async ({ data }) => pingAlpacaAccount(data.venue, data.creds));
 
 export const fetchAccountSnapshot = createServerFn({ method: "POST" })
   .validator((input: { venue: Venue; creds: Creds }) => input)
-  .handler(async ({ data }) => {
-    const [acct, positions, orders] = await Promise.all([
-      alpaca<AlpacaAccount>(data.venue, data.creds, "/v2/account"),
-      alpaca<AlpacaPosition[]>(data.venue, data.creds, "/v2/positions").catch(() => [] as AlpacaPosition[]),
-      alpaca<AlpacaOrder[]>(
-        data.venue,
-        data.creds,
-        "/v2/orders?status=all&limit=80&direction=desc",
-      ).catch(() => [] as AlpacaOrder[]),
-    ]);
-    return {
-      account: mapAccount(acct),
-      positions: positions.map(mapPosition),
-      orders: orders.map(mapOrder),
-    };
-  });
+  .handler(async ({ data }) => snapshotAlpaca(data.venue, data.creds));
 
 export const submitAlpacaOrder = createServerFn({ method: "POST" })
   .validator(
@@ -189,94 +33,24 @@ export const submitAlpacaOrder = createServerFn({ method: "POST" })
       stopPrice?: number;
     }) => input,
   )
-  .handler(async ({ data }) => {
-    const body: Record<string, string> = {
-      symbol: data.symbol,
-      side: data.side,
-      type: data.type,
-      time_in_force: data.tif,
-      qty: String(data.qty),
-    };
-    if (data.type === "limit" && data.limitPrice !== undefined) body.limit_price = String(data.limitPrice);
-    if (data.type === "stop" && data.stopPrice !== undefined) body.stop_price = String(data.stopPrice);
-    try {
-      const o = await alpaca<AlpacaOrder>(data.venue, data.creds, "/v2/orders", {
-        method: "POST",
-        body: JSON.stringify(body),
-      });
-      return { ok: true as const, order: mapOrder(o) };
-    } catch (err) {
-      return { ok: false as const, error: err instanceof Error ? err.message : "Order rejected" };
-    }
-  });
+  .handler(async ({ data }) => submitAlpacaOrderInner(data));
 
 export const cancelAlpacaOrder = createServerFn({ method: "POST" })
   .validator((input: { venue: Venue; creds: Creds; id: string }) => input)
-  .handler(async ({ data }) => {
-    try {
-      await alpaca(data.venue, data.creds, `/v2/orders/${encodeURIComponent(data.id)}`, {
-        method: "DELETE",
-      });
-      return { ok: true as const };
-    } catch (err) {
-      return { ok: false as const, error: err instanceof Error ? err.message : "Cancel failed" };
-    }
-  });
+  .handler(async ({ data }) => cancelAlpacaOrderInner(data.venue, data.creds, data.id));
 
 export const cancelAllAlpaca = createServerFn({ method: "POST" })
   .validator((input: { venue: Venue; creds: Creds }) => input)
-  .handler(async ({ data }) => {
-    try {
-      await alpaca(data.venue, data.creds, "/v2/orders", { method: "DELETE" });
-      return { ok: true as const };
-    } catch (err) {
-      return { ok: false as const, error: err instanceof Error ? err.message : "Cancel-all failed" };
-    }
-  });
+  .handler(async ({ data }) => cancelAllAlpacaInner(data.venue, data.creds));
 
 export const closeAlpacaPosition = createServerFn({ method: "POST" })
   .validator((input: { venue: Venue; creds: Creds; symbol: string }) => input)
-  .handler(async ({ data }) => {
-    try {
-      await alpaca(data.venue, data.creds, `/v2/positions/${encodeURIComponent(data.symbol)}`, {
-        method: "DELETE",
-      });
-      return { ok: true as const };
-    } catch (err) {
-      return { ok: false as const, error: err instanceof Error ? err.message : "Flatten failed" };
-    }
-  });
+  .handler(async ({ data }) => closeAlpacaPositionInner(data.venue, data.creds, data.symbol));
 
 export const closeAllAlpaca = createServerFn({ method: "POST" })
   .validator((input: { venue: Venue; creds: Creds }) => input)
-  .handler(async ({ data }) => {
-    try {
-      await alpaca(data.venue, data.creds, "/v2/positions", { method: "DELETE" });
-      return { ok: true as const };
-    } catch (err) {
-      return { ok: false as const, error: err instanceof Error ? err.message : "Flatten-all failed" };
-    }
-  });
+  .handler(async ({ data }) => closeAllAlpacaInner(data.venue, data.creds));
 
 export const fetchEquityHistory = createServerFn({ method: "POST" })
   .validator((input: { venue: Venue; creds: Creds }) => input)
-  .handler(async ({ data }): Promise<EquityPoint[]> => {
-    try {
-      const body = await alpaca<{ timestamp: number[]; equity: Array<number | null> }>(
-        data.venue,
-        data.creds,
-        "/v2/account/portfolio/history?period=1M&timeframe=1D",
-      );
-      const pts: EquityPoint[] = [];
-      for (let i = 0; i < (body.timestamp?.length ?? 0); i++) {
-        const v = body.equity?.[i];
-        const t = body.timestamp[i];
-        if (typeof v === "number" && typeof t === "number") {
-          pts.push({ t: t * 1000, v });
-        }
-      }
-      return pts;
-    } catch {
-      return [];
-    }
-  });
+  .handler(async ({ data }): Promise<EquityPoint[]> => fetchEquityHistoryInner(data.venue, data.creds));
