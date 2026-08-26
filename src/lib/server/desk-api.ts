@@ -1,6 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
 import { authMiddleware } from "@/lib/auth/middleware";
-import { runDeskAgent } from "@/lib/server/agent";
 import { executeDeskOp, type DeskOp } from "@/lib/server/desk-engine";
 import { claimOwner, loadDesk, publicDesk, requireOwner, type DeskSnapshot } from "@/lib/server/desk-store";
 import { createMcpToken, listMcpTokens, revokeMcpToken } from "@/lib/server/mcp-token.server";
@@ -40,16 +39,6 @@ export const runDeskOp = createServerFn({ method: "POST" })
       extra: result.extra ?? null,
       desk: publicDesk(result.desk),
     };
-  });
-
-export const askDeskAgent = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
-  .validator((input: { text: string }) => input)
-  .handler(async ({ context, data }) => {
-    const out = await runDeskAgent(context.userId, data.text);
-    if (!out.ok) return out;
-    const desk = await loadDesk(context.userId);
-    return { ...out, desk: publicDesk(desk) };
   });
 
 export const listDeskTokens = createServerFn({ method: "GET" })

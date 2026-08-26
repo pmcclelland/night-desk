@@ -13,8 +13,7 @@ export type BotCommand =
   | { op: "watch"; action: "add" | "rm"; symbol: string }
   | { op: "arm"; id: string }
   | { op: "disarm"; id: string }
-  | { op: "select"; symbol: string }
-  | { op: "ask"; text: string };
+  | { op: "select"; symbol: string };
 
 const HELP = `Commands
   BUY 10 AAPL                 market buy
@@ -28,7 +27,7 @@ const HELP = `Commands
   THESIS NVDA
   WATCH ADD AMD | WATCH RM AMD
   HALT | RESUME | STATUS | HELP
-Anything else is handled by the desk agent (Grok), which can also trade.`;
+Freeform lives on the Grok Bot.`;
 
 export function helpText() {
   return HELP;
@@ -134,5 +133,5 @@ export function parseCommand(raw: string, lastPrice?: number): BotCommand | null
     return { op: "select", symbol: normalizeSymbol(u) };
   }
 
-  return { op: "ask", text };
+  return null;
 }

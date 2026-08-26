@@ -1,4 +1,3 @@
-import { runDeskAgent } from "@/lib/server/agent";
 import { executeDeskOp, quotesForDesk, type DeskOp } from "@/lib/server/desk-engine";
 import type { OrderRequest } from "@/lib/types";
 
@@ -108,16 +107,6 @@ const TOOLS = [
     inputSchema: { type: "object", properties: { symbol: { type: "string" } } },
   },
   {
-    name: "ask_desk",
-    description:
-      "Freeform operator request. Grok uses the same trading tools and answers outside the BOT command grammar.",
-    inputSchema: {
-      type: "object",
-      properties: { text: { type: "string" } },
-      required: ["text"],
-    },
-  },
-  {
     name: "bot_log",
     description: "Read recent lines from the operator BOT panel.",
     inputSchema: {
@@ -170,12 +159,6 @@ function num(v: unknown): number | undefined {
 }
 
 async function callTool(userId: string, name: string, args: Record<string, unknown>) {
-  if (name === "ask_desk") {
-    const text = String(args.text ?? "").trim();
-    if (!text) throw new Error("text is required");
-    const out = await runDeskAgent(userId, text);
-    return textResult(out, !out.ok);
-  }
   if (name === "get_quotes") {
     const symbols = Array.isArray(args.symbols)
       ? args.symbols.filter((s): s is string => typeof s === "string")

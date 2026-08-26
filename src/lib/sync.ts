@@ -21,8 +21,8 @@ import {
   pingAlpaca,
   submitAlpacaOrder,
 } from "@/lib/server/trade";
-import { askDeskAgent, runDeskOp } from "@/lib/server/desk-api";
-import { applyPulledDesk, queuePersist } from "@/lib/desk-sync";
+import { runDeskOp } from "@/lib/server/desk-api";
+import { queuePersist } from "@/lib/desk-sync";
 import { selectAccount, selectPositions, useDesk } from "@/lib/store";
 import type { OrderRequest, Venue } from "@/lib/types";
 
@@ -334,14 +334,7 @@ export async function runThesis(symbol: string) {
   }
   const local = localThesis(symbol, last || bars.at(-1)?.c || 0, bars);
   s.log("ai", local);
-  const grok = await askDeskAgent({
-    data: {
-      text: `Write a 3-sentence trade thesis for ${symbol}. Last ${last}. Be specific, no hype. Do not trade.`,
-    },
-  });
-  if (grok.ok && grok.say) s.log("ai", grok.say);
-  if (grok.ok && "desk" in grok && grok.desk) applyPulledDesk(grok.desk);
-  else queuePersist();
+  queuePersist();
 }
 
 export async function runConsole(raw: string) {
@@ -352,7 +345,10 @@ export async function runConsole(raw: string) {
   const last = s.quotes[s.selected]?.last;
   const cmd = parseCommand(text, last);
 
-  if (!cmd) return;
+  if (!cmd) {
+    s.log("sys", "Unknown command. Type HELP. Freeform goes to the Grok Bot.");
+    return;
+  }
 
   if (cmd.op === "help") {
     s.log("sys", helpText());
@@ -427,14 +423,5 @@ export async function runConsole(raw: string) {
   if (cmd.op === "order") {
     await placeOrder(cmd.request);
     return;
-  }
-  if (cmd.op === "ask") {
-    const grok = await askDeskAgent({ data: { text: cmd.text } });
-    if (!grok.ok) {
-      s.log("err", grok.error + " — use HELP for the command language.");
-      return;
-    }
-    if (grok.say) s.log("ai", grok.say);
-    if ("desk" in grok && grok.desk) applyPulledDesk(grok.desk);
   }
 }

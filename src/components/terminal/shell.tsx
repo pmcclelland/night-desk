@@ -50,7 +50,7 @@ export function TerminalShell() {
   useEffect(() => {
     const s = useDesk.getState();
     if (s.botLog.length === 0) {
-      s.log("sys", "NIGHTDESK online. Venue SIM. Type HELP or ask the desk in English.");
+      s.log("sys", "NIGHTDESK online. Venue SIM. Type HELP. Freeform goes to the Grok Bot.");
     }
     void hydrateDesk().then(() => {
       void refreshQuotes();
