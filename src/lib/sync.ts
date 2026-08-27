@@ -22,58 +22,92 @@ function unique(xs: string[]) {
   return [...new Set(xs.filter(Boolean))];
 }
 
+function singleFlight(slot: { current: Promise<void> | null }, run: () => Promise<void>) {
+  if (slot.current) return slot.current;
+  slot.current = run().finally(() => {
+    slot.current = null;
+  });
+  return slot.current;
+}
+
+const quotesFlight: { current: Promise<void> | null } = { current: null };
+const alpacaFlight: { current: Promise<void> | null } = { current: null };
+const strategyFlight: { current: Promise<void> | null } = { current: null };
+let barsFlight: Promise<void> | null = null;
+let barsFlightKey = "";
+let barsFlightGen = 0;
+
 export async function refreshQuotes() {
-  const s = useDesk.getState();
-  const symbols = unique([
-    s.selected,
-    ...s.watchlist,
-    ...s.sim.positions.map((p) => p.symbol),
-    ...s.alpacaPositions.map((p) => p.symbol),
-    ...s.strategies.map((st) => st.symbol),
-  ]);
-  try {
-    const pack = await fetchQuotes({
-      data: { symbols, venue: s.venue },
-    });
-    const quotes = pack.quotes;
-    const { setQuotes, setSim, venue, sim, log } = useDesk.getState();
-    setQuotes(quotes, pack.source);
-    if (venue === "sim") {
-      const matched = matchWorkingOrders(sim, quotes);
-      let next = matched.book;
-      next = snapshotEquity(next, quotes);
-      setSim(next);
-      for (const f of matched.fills) {
-        log(
-          "fill",
-          `FILL ${f.side.toUpperCase()} ${f.qty} ${f.symbol} @ ${f.filledAvgPrice?.toFixed(2)}`,
-        );
-        toast.success(`Filled ${f.side} ${f.qty} ${f.symbol}`);
+  return singleFlight(quotesFlight, async () => {
+    const s = useDesk.getState();
+    const symbols = unique([
+      s.selected,
+      ...s.watchlist,
+      ...s.sim.positions.map((p) => p.symbol),
+      ...s.alpacaPositions.map((p) => p.symbol),
+      ...s.strategies.map((st) => st.symbol),
+    ]);
+    try {
+      const pack = await fetchQuotes({
+        data: { symbols, venue: s.venue },
+      });
+      const quotes = pack.quotes;
+      const { setQuotes, setSim, venue, sim, log } = useDesk.getState();
+      setQuotes(quotes, pack.source);
+      if (venue === "sim") {
+        const matched = matchWorkingOrders(sim, quotes);
+        let next = matched.book;
+        next = snapshotEquity(next, quotes);
+        setSim(next);
+        for (const f of matched.fills) {
+          log(
+            "fill",
+            `FILL ${f.side.toUpperCase()} ${f.qty} ${f.symbol} @ ${f.filledAvgPrice?.toFixed(2)}`,
+          );
+          toast.success(`Filled ${f.side} ${f.qty} ${f.symbol}`);
+        }
+        if (matched.fills.length) queuePersist();
       }
-      if (matched.fills.length) queuePersist();
+    } catch (err) {
+      useDesk.getState().log("err", err instanceof Error ? err.message : "Quote feed failed");
     }
-  } catch (err) {
-    useDesk.getState().log("err", err instanceof Error ? err.message : "Quote feed failed");
-  }
+  });
+}
+
+function barsKeyOf() {
+  const s = useDesk.getState();
+  return `${s.selected}|${s.barRange}|${s.venue}`;
 }
 
 export async function refreshBars() {
-  const s = useDesk.getState();
-  s.setBarsLoading(true);
-  try {
-    const pack = await fetchBars({
-      data: { symbol: s.selected, range: s.barRange, venue: s.venue },
-    });
-    if (!pack.bars.length) {
+  const key = barsKeyOf();
+  if (barsFlight && barsFlightKey === key) return barsFlight;
+  const gen = ++barsFlightGen;
+  barsFlightKey = key;
+  const run = (async () => {
+    useDesk.getState().setBarsLoading(true);
+    try {
+      const s = useDesk.getState();
+      const pack = await fetchBars({
+        data: { symbol: s.selected, range: s.barRange, venue: s.venue },
+      });
+      if (gen !== barsFlightGen) return;
+      if (!pack.bars.length) {
+        useDesk.getState().setBarsLoading(false);
+        useDesk.getState().log("err", `No bars for ${s.selected} ${s.barRange}`);
+        return;
+      }
+      useDesk.getState().setBars(s.selected, pack.bars, pack.source);
+    } catch (err) {
+      if (gen !== barsFlightGen) return;
       useDesk.getState().setBarsLoading(false);
-      useDesk.getState().log("err", `No bars for ${s.selected} ${s.barRange}`);
-      return;
+      useDesk.getState().log("err", err instanceof Error ? err.message : "Chart feed failed");
     }
-    useDesk.getState().setBars(s.selected, pack.bars, pack.source);
-  } catch (err) {
-    useDesk.getState().setBarsLoading(false);
-    useDesk.getState().log("err", err instanceof Error ? err.message : "Chart feed failed");
-  }
+  })().finally(() => {
+    if (gen === barsFlightGen) barsFlight = null;
+  });
+  barsFlight = run;
+  return run;
 }
 
 function applyAlpacaExtra(extra?: {
@@ -93,17 +127,19 @@ function applyAlpacaExtra(extra?: {
 export async function refreshAlpaca() {
   const s = useDesk.getState();
   if (s.venue === "sim") return;
-  try {
-    const snap = await refreshAlpacaBook();
-    if (!snap.ok) throw new Error(snap.error);
-    useDesk.getState().setAlpacaBook({
-      account: snap.account,
-      positions: snap.positions,
-      orders: snap.orders,
-    });
-  } catch (err) {
-    useDesk.getState().log("err", err instanceof Error ? err.message : "Alpaca snapshot failed");
-  }
+  return singleFlight(alpacaFlight, async () => {
+    try {
+      const snap = await refreshAlpacaBook();
+      if (!snap.ok) throw new Error(snap.error);
+      useDesk.getState().setAlpacaBook({
+        account: snap.account,
+        positions: snap.positions,
+        orders: snap.orders,
+      });
+    } catch (err) {
+      useDesk.getState().log("err", err instanceof Error ? err.message : "Alpaca snapshot failed");
+    }
+  });
 }
 
 function riskHaltIfNeeded() {
@@ -276,42 +312,43 @@ export async function tickStrategies() {
   if (s.halted) return;
   const armed = s.strategies.filter((st) => st.armed);
   if (armed.length === 0) return;
-
-  for (const st of armed) {
-    try {
-      const pack = await fetchBars({
-        data: { symbol: st.symbol, range: "6M", venue: s.venue },
-      });
-      const sig = evaluateStrategy(st, pack.bars);
-      useDesk.getState().patchStrategy(st.id, { lastSignal: sig.action, note: sig.note });
-      if (Date.now() - st.lastFiredAt < 15 * 60_000 && st.lastFiredAt !== 0) continue;
-
-      const pos = selectPositions(useDesk.getState()).find((p) => p.symbol === st.symbol);
-      const qty = pos?.qty ?? 0;
-      if (sig.action === "buy" && qty <= 0) {
-        const res = await placeOrder({
-          symbol: st.symbol,
-          side: "buy",
-          type: "market",
-          qty: st.qty,
-          tif: "day",
-          source: "strategy",
+  return singleFlight(strategyFlight, async () => {
+    for (const st of armed) {
+      try {
+        const pack = await fetchBars({
+          data: { symbol: st.symbol, range: "6M", venue: s.venue },
         });
-        if (res.ok) {
-          useDesk.getState().patchStrategy(st.id, { lastFiredAt: Date.now(), lastSignal: "buy" });
-          useDesk.getState().log("signal", `${st.name} BUY ${st.qty} ${st.symbol} · ${sig.note}`);
+        const sig = evaluateStrategy(st, pack.bars);
+        useDesk.getState().patchStrategy(st.id, { lastSignal: sig.action, note: sig.note });
+        if (Date.now() - st.lastFiredAt < 15 * 60_000 && st.lastFiredAt !== 0) continue;
+
+        const pos = selectPositions(useDesk.getState()).find((p) => p.symbol === st.symbol);
+        const qty = pos?.qty ?? 0;
+        if (sig.action === "buy" && qty <= 0) {
+          const res = await placeOrder({
+            symbol: st.symbol,
+            side: "buy",
+            type: "market",
+            qty: st.qty,
+            tif: "day",
+            source: "strategy",
+          });
+          if (res.ok) {
+            useDesk.getState().patchStrategy(st.id, { lastFiredAt: Date.now(), lastSignal: "buy" });
+            useDesk.getState().log("signal", `${st.name} BUY ${st.qty} ${st.symbol} · ${sig.note}`);
+          }
+        } else if ((sig.action === "sell" || sig.action === "flat") && qty > 0) {
+          await flatten(st.symbol);
+          useDesk.getState().patchStrategy(st.id, { lastFiredAt: Date.now(), lastSignal: sig.action });
+          useDesk.getState().log("signal", `${st.name} FLATTEN ${st.symbol} · ${sig.note}`);
         }
-      } else if ((sig.action === "sell" || sig.action === "flat") && qty > 0) {
-        await flatten(st.symbol);
-        useDesk.getState().patchStrategy(st.id, { lastFiredAt: Date.now(), lastSignal: sig.action });
-        useDesk.getState().log("signal", `${st.name} FLATTEN ${st.symbol} · ${sig.note}`);
+      } catch (err) {
+        useDesk
+          .getState()
+          .log("err", `${st.name}: ${err instanceof Error ? err.message : "tick failed"}`);
       }
-    } catch (err) {
-      useDesk
-        .getState()
-        .log("err", `${st.name}: ${err instanceof Error ? err.message : "tick failed"}`);
     }
-  }
+  });
 }
 
 export async function runThesis(symbol: string) {

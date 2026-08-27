@@ -40,12 +40,13 @@ export function TerminalShell() {
   const desktop = useIsDesktop();
   const selected = useDesk((s) => s.selected);
   const barRange = useDesk((s) => s.barRange);
-  const venue = useDesk((s) => s.venue);
   const mobileTab = useDesk((s) => s.mobileTab);
   const setMobileTab = useDesk((s) => s.setMobileTab);
   const immersive = useDesk((s) => s.immersive);
   const chartFocus = useDesk((s) => s.chartFocus);
   const rootRef = useRef<HTMLDivElement>(null);
+
+  const live = useRef(false);
 
   useEffect(() => {
     const s = useDesk.getState();
@@ -53,6 +54,7 @@ export function TerminalShell() {
       s.log("sys", "NIGHTDESK online. Venue SIM. Type HELP. Freeform goes to the Grok Bot.");
     }
     void hydrateDesk().then(() => {
+      live.current = true;
       void refreshQuotes();
       void refreshBars();
       if (useDesk.getState().venue !== "sim") void refreshAlpaca();
@@ -60,23 +62,39 @@ export function TerminalShell() {
   }, []);
 
   useEffect(() => {
+    if (!live.current) return;
     void refreshBars();
   }, [selected, barRange]);
 
   useEffect(() => {
-    const q = window.setInterval(() => void refreshQuotes(), 8000);
-    const a = window.setInterval(() => {
+    const unlessHidden = (fn: () => void) => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      fn();
+    };
+    const q = window.setInterval(() => unlessHidden(() => void refreshQuotes()), 8000);
+    const a = window.setInterval(
+      () =>
+        unlessHidden(() => {
+          if (useDesk.getState().venue !== "sim") void refreshAlpaca();
+        }),
+      15000,
+    );
+    const s = window.setInterval(() => unlessHidden(() => void tickStrategies()), 20000);
+    const p = window.setInterval(() => unlessHidden(() => void hydrateDesk()), 30000);
+    const onVis = () => {
+      if (document.hidden) return;
+      void refreshQuotes();
       if (useDesk.getState().venue !== "sim") void refreshAlpaca();
-    }, 15000);
-    const s = window.setInterval(() => void tickStrategies(), 20000);
-    const p = window.setInterval(() => void hydrateDesk(), 12000);
+    };
+    document.addEventListener("visibilitychange", onVis);
     return () => {
       window.clearInterval(q);
       window.clearInterval(a);
       window.clearInterval(s);
       window.clearInterval(p);
+      document.removeEventListener("visibilitychange", onVis);
     };
-  }, [venue]);
+  }, []);
 
   useEffect(() => {
     return subscribeFullscreen(() => {

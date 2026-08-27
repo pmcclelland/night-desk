@@ -107,7 +107,7 @@ export function SettingsDialog() {
               Same Alpaca key pair drives both APIs. Tape and candles from data.alpaca.markets (IEX
               real-time on free keys; SIP if you subscribe). Account, positions, and orders from the
               paper or live trading host. Yahoo fills any missed snapshot. REST poll — quotes 8s,
-              book 15s.
+              book 15s. Background tabs pause.
             </p>
           )}
           <p className="mt-2 font-mono text-micro tracking-widest text-subtle uppercase">
