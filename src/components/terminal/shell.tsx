@@ -55,7 +55,7 @@ export function TerminalShell() {
     void hydrateDesk().then(() => {
       void refreshQuotes();
       void refreshBars();
-      if (useDesk.getState().venue !== "sim" && useDesk.getState().creds) void refreshAlpaca();
+      if (useDesk.getState().venue !== "sim") void refreshAlpaca();
     });
   }, []);
 

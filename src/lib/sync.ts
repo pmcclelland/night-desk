@@ -33,7 +33,7 @@ export async function refreshQuotes() {
   ]);
   try {
     const pack = await fetchQuotes({
-      data: { symbols, venue: s.venue, creds: s.creds },
+      data: { symbols, venue: s.venue },
     });
     const quotes = pack.quotes;
     const { setQuotes, setSim, venue, sim, log } = useDesk.getState();
@@ -62,7 +62,7 @@ export async function refreshBars() {
   s.setBarsLoading(true);
   try {
     const pack = await fetchBars({
-      data: { symbol: s.selected, range: s.barRange, venue: s.venue, creds: s.creds },
+      data: { symbol: s.selected, range: s.barRange, venue: s.venue },
     });
     if (!pack.bars.length) {
       useDesk.getState().setBarsLoading(false);
@@ -92,7 +92,7 @@ function applyAlpacaExtra(extra?: {
 
 export async function refreshAlpaca() {
   const s = useDesk.getState();
-  if (s.venue === "sim" || !s.creds) return;
+  if (s.venue === "sim") return;
   try {
     const snap = await refreshAlpacaBook();
     if (!snap.ok) throw new Error(snap.error);
@@ -280,7 +280,7 @@ export async function tickStrategies() {
   for (const st of armed) {
     try {
       const pack = await fetchBars({
-        data: { symbol: st.symbol, range: "6M", venue: s.venue, creds: s.creds },
+        data: { symbol: st.symbol, range: "6M", venue: s.venue },
       });
       const sig = evaluateStrategy(st, pack.bars);
       useDesk.getState().patchStrategy(st.id, { lastSignal: sig.action, note: sig.note });
@@ -320,7 +320,7 @@ export async function runThesis(symbol: string) {
   let bars = s.selected === symbol ? s.bars : [];
   if (bars.length < 30) {
     const pack = await fetchBars({
-      data: { symbol, range: "6M", venue: s.venue, creds: s.creds },
+      data: { symbol, range: "6M", venue: s.venue },
     });
     bars = pack.bars;
   }

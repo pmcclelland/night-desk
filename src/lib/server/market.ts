@@ -1,4 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
+import { authMiddleware } from "@/lib/auth/middleware";
+import { loadDesk } from "@/lib/server/desk-store";
 import { nameOf, SEED } from "@/lib/universe";
 import type { Bar, BarRange, BarSource, Creds, Quote, TapeSource, Venue } from "@/lib/types";
 
@@ -138,6 +140,23 @@ type Snap = {
   prevDailyBar?: { c?: number };
 };
 
+function usableCreds(creds?: Creds | null): Creds | null {
+  if (creds?.keyId && creds.secret) return creds;
+  return null;
+}
+
+async function credsForUser(userId: string, fallback?: Creds | null): Promise<{
+  venue?: Venue;
+  creds: Creds | null;
+}> {
+  try {
+    const desk = await loadDesk(userId);
+    return { venue: desk.venue, creds: usableCreds(desk.creds) ?? usableCreds(fallback) };
+  } catch {
+    return { creds: usableCreds(fallback) };
+  }
+}
+
 function alpacaHeaders(creds: Creds) {
   return {
     "APCA-API-KEY-ID": creds.keyId,
@@ -197,8 +216,9 @@ export async function loadQuotes(data: {
   const now = Date.now();
   const symbols = data.symbols.map((s) => s.toUpperCase()).filter(Boolean);
   if (symbols.length === 0) return { quotes: {}, source: "seed" };
-  if ((data.venue === "alpaca-paper" || data.venue === "alpaca-live") && data.creds) {
-    const live = await alpacaQuotes(symbols, data.creds, now);
+  const creds = usableCreds(data.creds);
+  if ((data.venue === "alpaca-paper" || data.venue === "alpaca-live") && creds) {
+    const live = await alpacaQuotes(symbols, creds, now);
     if (live) {
       const missing = symbols.filter((s) => !live[s]);
       if (missing.length) {
@@ -213,8 +233,16 @@ export async function loadQuotes(data: {
 }
 
 export const fetchQuotes = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
   .validator((input: { symbols: string[]; venue: Venue; creds?: Creds | null }) => input)
-  .handler(async ({ data }) => loadQuotes(data));
+  .handler(async ({ context, data }) => {
+    const resolved = await credsForUser(context.userId, data.creds);
+    return loadQuotes({
+      symbols: data.symbols,
+      venue: resolved.venue ?? data.venue,
+      creds: resolved.creds,
+    });
+  });
 
 interface YahooChart {
   chart?: {
@@ -313,8 +341,8 @@ export async function loadBars(data: {
   creds?: Creds | null;
 }): Promise<{ bars: Bar[]; source: BarSource }> {
   const symbol = data.symbol.toUpperCase();
-  if ((data.venue === "alpaca-paper" || data.venue === "alpaca-live") && data.creds) {
-    const live = await alpacaBars(symbol, data.range, data.creds);
+  if ((data.venue === "alpaca-paper" || data.venue === "alpaca-live") && usableCreds(data.creds)) {
+    const live = await alpacaBars(symbol, data.range, usableCreds(data.creds)!);
     if (live) return { bars: live, source: "alpaca" };
   }
   try {
@@ -327,5 +355,14 @@ export async function loadBars(data: {
 }
 
 export const fetchBars = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
   .validator((input: { symbol: string; range: BarRange; venue: Venue; creds?: Creds | null }) => input)
-  .handler(async ({ data }) => loadBars(data));
+  .handler(async ({ context, data }) => {
+    const resolved = await credsForUser(context.userId, data.creds);
+    return loadBars({
+      symbol: data.symbol,
+      range: data.range,
+      venue: resolved.venue ?? data.venue,
+      creds: resolved.creds,
+    });
+  });
