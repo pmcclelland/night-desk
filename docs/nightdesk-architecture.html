@@ -75,7 +75,7 @@
     .lede {
       font-size: 18px;
       color: var(--muted);
-      max-width: 42rem;
+      max-width: 44rem;
       margin: 0 0 36px;
     }
     h2 {
@@ -132,8 +132,6 @@
       color: var(--subtle);
       margin-bottom: 6px;
     }
-
-    /* Layer stack */
     .layers { display: flex; flex-direction: column; gap: 6px; }
     .layer {
       display: grid;
@@ -153,8 +151,6 @@
     }
     .layer p { margin: 0; font-size: 14px; color: var(--muted); }
     .layer.core { border-color: color-mix(in oklab, var(--accent) 45%, var(--border)); }
-
-    /* Desk wireframe */
     .desk {
       display: grid;
       grid-template-rows: 36px 28px 1fr 0.72fr;
@@ -165,10 +161,7 @@
       background: var(--bg);
       font-family: var(--mono);
     }
-    .desk-top {
-      display: grid;
-      grid-template-columns: 0.22fr 0.54fr 0.24fr;
-    }
+    .desk-top { display: grid; grid-template-columns: 0.22fr 0.54fr 0.24fr; }
     .desk-bot {
       display: grid;
       grid-template-columns: 0.34fr 0.24fr 0.42fr;
@@ -236,8 +229,6 @@
       background: var(--bg);
     }
     .tag.write { color: var(--accent); border-color: color-mix(in oklab, var(--accent) 40%, var(--border)); }
-
-    /* Flow */
     .flow {
       display: grid;
       grid-template-columns: 1fr auto 1fr auto 1fr;
@@ -262,7 +253,6 @@
       font-family: var(--mono);
       font-size: 18px;
     }
-
     svg.arch { width: 100%; height: auto; display: block; background: var(--surface); border: 1px solid var(--border); }
     .caption {
       font-family: var(--mono);
@@ -307,56 +297,64 @@
   <header class="mast">
     <div class="wrap mast-row">
       <div class="brand">NIGHTDESK</div>
-      <div class="mast-meta">Architecture briefing · one desk · one store · three venues</div>
+      <div class="mast-meta">Architecture briefing · one owner · Neon desk · MCP bot</div>
     </div>
   </header>
 
   <div class="wrap">
-    <h1>The terminal is the architecture.</h1>
+    <h1>The terminal is still the architecture.</h1>
     <p class="lede">
-      NightDesk is a single-route trading terminal. There is no page tree, no user accounts, no shared database.
-      The chrome you see — header, tape, six panels — is a spatial encoding of one Zustand desk store,
-      driven by one action bus, against one of three venues.
+      NightDesk is a single-operator trading terminal at <code>/</code>. The chrome — header, tape, six panels —
+      is a spatial encoding of one desk. What changed: the desk is no longer a browser. Google claims the slot,
+      Neon holds the book, and a personal Grok Bot trades through MCP on the same engine the ticket uses.
     </p>
 
     <h2>Shape of the system</h2>
     <p class="note">
-      TanStack Start mounts <code>/</code> to <code>TerminalShell</code>. Auth and Postgres stay off.
-      Persistence is the browser’s <code>localStorage</code> key <code>nightdesk.v1</code>.
-      Deployed as a Vercel app; market, trade, and Grok calls are TanStack server functions.
+      TanStack Start. Deployed on Vercel at nightdesk.pmcclel.land. Native Google OAuth (Better Auth), not the Grok broker.
+      First signer owns <code>desk_owner</code>. Local preview without <code>DATABASE_URL</code> still uses in-memory PGLite;
+      production is Neon. Browser Zustand is a cache that hydrates every 12s and persists through <code>desk-engine</code>.
     </p>
 
     <div class="layers" style="margin-top:18px">
       <div class="layer">
+        <div class="name">Gate</div>
+        <p><code>/login</code> · Continue with Google · <code>desk_owner</code> slot=1. Non-owners see a claimed-desk wall.</p>
+      </div>
+      <div class="layer">
         <div class="name">Chrome</div>
-        <p>IBM Plex · tokens in <code>styles.css</code> · <code>Panel</code> primitive · header, tape, kill, fullscreen.</p>
+        <p>IBM Plex · tokens in <code>styles.css</code> · <code>Panel</code> · header (Kill, settings, operator chip), tape, fullscreen.</p>
       </div>
       <div class="layer">
         <div class="name">Layout</div>
-        <p>Desktop: resizable 2×3 grid. Mobile: five tabs. Chart-focus (F) and immersive (Shift+F) hide chrome, not the tape.</p>
+        <p>Desktop: resizable 2×3. Mobile: five tabs. Chart-focus (F) and immersive (Shift+F) hide chrome, not the tape.</p>
       </div>
       <div class="layer core">
-        <div class="name">Desk store</div>
-        <p><code>useDesk</code> — venue, quotes, bars, selected, sim book, Alpaca snapshot, strategies, bot log, halt, risk.</p>
+        <div class="name">Desk engine</div>
+        <p><code>desk-engine.ts</code> — halt, risk, venue, orders, tape lines. Browser and MCP are two clients of one write path.</p>
       </div>
       <div class="layer core">
-        <div class="name">Action bus</div>
-        <p><code>sync.ts</code> — refresh quotes/bars/Alpaca, place/cancel/flatten, kill, strategy ticks, console.</p>
+        <div class="name">Neon</div>
+        <p>Auth tables · <code>desk_owner</code> · <code>desk_state</code> (encrypted Alpaca keys) · <code>mcp_tokens</code> · <code>desk_kv</code>.</p>
+      </div>
+      <div class="layer">
+        <div class="name">Browser cache</div>
+        <p><code>useDesk</code> + <code>nightdesk.v1</code>. Selection and tape persist; hydrate must not snap a newer local pick.</p>
       </div>
       <div class="layer">
         <div class="name">Venues</div>
-        <p>SIM (in-browser matching) · Alpaca paper · Alpaca live. Views never talk to a venue directly; they read <code>useLiveBook()</code>.</p>
+        <p>SIM · Alpaca paper · Alpaca live. Views never talk to a venue; they read <code>useLiveBook()</code>.</p>
       </div>
       <div class="layer">
-        <div class="name">Feeds</div>
-        <p>Server functions: Alpaca IEX first, Yahoo delayed fallback, seeded jitter if both fail. Tape source badge: IEX / YH / MIX / SEED.</p>
+        <div class="name">Grok Bot</div>
+        <p>Custom bot on <code>/api/mcp</code> with a minted <code>ndk_</code> bearer. Tools trade and speak on the BOT tape. No in-app xAI loop.</p>
       </div>
     </div>
 
     <h2>The desk as a data map</h2>
     <p class="note">
-      Click a region. The inspect pane shows which store slices it reads and which actions it fires.
-      Selection is the only coordination key: watch, chart, ticket, thesis, and bot all orbit <code>selected</code>.
+      Click a region. The inspect pane shows which slices it reads and which actions it fires.
+      Selection is still the coordination key — now durable on Neon, not only in the tab.
     </p>
 
     <div class="desk" id="desk" role="group" aria-label="NightDesk layout map">
@@ -366,6 +364,7 @@
         <span class="led"></span>
         <span style="color:var(--muted);font-size:10px">MARKET OPEN</span>
         <span style="margin-left:auto;font-size:10px;color:var(--muted)">EQ · CASH · DAY</span>
+        <span style="font-size:10px;color:var(--muted);letter-spacing:.12em">OP</span>
         <span style="font-size:10px;color:var(--down);letter-spacing:.12em">KILL</span>
       </button>
       <button class="cell tape" data-id="tape" type="button">
@@ -377,21 +376,21 @@
       <div class="desk-top">
         <button class="cell watch" data-id="watch" type="button">
           <div class="lbl">Watch</div>
-          <div class="ghost">watchlist + quotes<br>selected row elevated</div>
+          <div class="ghost">watchlist + quotes<br>selectSymbol persists</div>
         </button>
         <button class="cell chart" data-id="chart" type="button">
           <div class="lbl">AAPL · Apple</div>
-          <div class="ghost">bars for selected · range · thesis · position overlay</div>
+          <div class="ghost">bars for selected · range · local thesis</div>
         </button>
         <button class="cell ticket" data-id="ticket" type="button">
           <div class="lbl">Ticket</div>
-          <div class="ghost">placeOrder(selected)<br>risk-sized · halt-aware</div>
+          <div class="ghost">runDeskOp place_order<br>risk-sized · halt-aware</div>
         </button>
       </div>
       <div class="desk-bot">
         <button class="cell book" data-id="blotter" type="button">
           <div class="lbl">Blotter</div>
-          <div class="ghost">useLiveBook()<br>positions / working orders</div>
+          <div class="ghost">useLiveBook()<br>positions / working</div>
         </button>
         <button class="cell algos" data-id="algos" type="button">
           <div class="lbl">Algos</div>
@@ -399,7 +398,7 @@
         </button>
         <button class="cell bot" data-id="bot" type="button">
           <div class="lbl">Bot</div>
-          <div class="ghost">parseCommand · Grok fallback<br>botLog as the journal</div>
+          <div class="ghost">command tape · CLEAR<br>Grok Bot via MCP</div>
         </button>
       </div>
     </div>
@@ -411,35 +410,33 @@
 
     <h2>Why the design looks like this</h2>
     <p>
-      The visual system is not decoration around the architecture — it is how the architecture is read at a glance.
-      Instrument black and amber LED come from a vehicle-dashboard mood: one intense status color, phosphor green/red only for signed P&amp;L.
-      IBM Plex Mono is the type of a blotter, not a marketing site. Hairline borders and 28px panel headers
-      (<code>Panel</code>) make six independent surfaces share one grammar so a resize does not become six products.
+      The visual system is how the architecture is read at a glance. Instrument black and amber LED: one identity color,
+      phosphor green/red only for signed P&amp;L. IBM Plex Mono is blotter type. Hairline borders and 28px <code>Panel</code>
+      headers keep six surfaces in one grammar so a resize does not become six products.
     </p>
     <div class="grid-2">
       <div class="card">
         <div class="kicker">Density</div>
         <h3>Everything on one plane</h3>
         <p class="note">
-          A trading desk fails if you context-switch. Watch, chart, ticket, blotter, algos, and bot are simultaneous
-          because they share one <code>selected</code> and one quote map. Mobile cannot fit the plane, so the same
-          components become tabs — not a different app.
+          Watch, chart, ticket, blotter, algos, and bot stay simultaneous because they share one <code>selected</code>
+          and one quote map. Mobile tabs the same components — not a different app.
         </p>
       </div>
       <div class="card">
         <div class="kicker">Status color</div>
         <h3>Signed numbers carry the accent</h3>
         <p class="note">
-          Amber is identity (wordmark, panel titles, armed range). Green/red are only change, P&amp;L, buy/sell, halt.
-          The Kill control is the one red chrome that is not a quote — it is a global write to <code>halted</code>.
+          Amber is identity. Green/red are change, P&amp;L, buy/sell, halt. Kill is the one red chrome that is not a quote —
+          a global write to <code>halted</code> on the engine.
         </p>
       </div>
       <div class="card">
         <div class="kicker">Motion</div>
         <h3>Tape is the live feed made visible</h3>
         <p class="note">
-          The scrolling tape is the quotes interval (8s) expressed as a marquee. It fills the viewport, then loops on
-          half-width so the last name meets the first. Hover pauses it. Reduced-motion stops it. Chart-focus keeps it.
+          Quotes interval (8s) as a marquee. Fills the viewport, loops on half-width so the last name meets the first.
+          Hover pauses. Reduced-motion stops it. Chart-focus keeps it.
         </p>
       </div>
       <div class="card">
@@ -447,51 +444,108 @@
         <h3>LIVE never persists as LIVE</h3>
         <p class="note">
           Venue badge, tape source, and Kill sit in the header because they are process-wide.
-          Persist rewrites <code>alpaca-live</code> to paper so a refresh cannot silently reopen a live desk.
+          Client persist still rewrites <code>alpaca-live</code> to paper. Alpaca secrets are AES-GCM on Neon, not in the tab.
+        </p>
+      </div>
+    </div>
+
+    <h2>Identity and the slot</h2>
+    <div class="grid-2">
+      <div class="card">
+        <div class="kicker">Google</div>
+        <h3>Native OAuth on the custom domain</h3>
+        <p class="note">
+          Better Auth at <code>/api/auth/*</code> with a NightDesk Google client. Callback
+          <code>/api/auth/callback/google</code>. The Grok broker is preview-only
+          (<code>*.grok-sandbox.com</code>); nightdesk.pmcclel.land cannot use it.
+        </p>
+      </div>
+      <div class="card">
+        <div class="kicker">Owner</div>
+        <h3>First signer claims the desk</h3>
+        <p class="note">
+          <code>desk_owner (slot=1)</code>. Later Google accounts are signed in but blocked from the terminal.
+          MCP tokens hash to the owner. There is no multi-user blotter.
         </p>
       </div>
     </div>
 
     <h2>Control plane</h2>
     <p class="note">
-      Panels do not call Alpaca or Yahoo. They call <code>sync.ts</code>, which branches on venue and writes the store.
-      That is why Halt, Kill, and risk caps apply equally to ticket clicks, bot commands, and armed strategies.
+      Panels do not call Alpaca. They call <code>sync.ts</code>, which goes through <code>runDeskOp</code> /
+      <code>desk-engine</code>. The Grok Bot hits the same engine via MCP. Halt, Kill, and risk caps apply to ticket,
+      typed commands, armed strategies, and bot tools.
     </p>
 
-    <svg class="arch" viewBox="0 0 1040 340" role="img" aria-label="Control plane from UI through sync to venues">
-      <rect x="0" y="0" width="1040" height="340" fill="#0b0d11" />
-      <text x="24" y="28" fill="#e39400" font-family="IBM Plex Mono" font-size="11" letter-spacing="2">UI SURFACES</text>
+    <svg class="arch" viewBox="0 0 1040 420" role="img" aria-label="Control plane from UI and MCP through the desk engine to venues and Neon">
+      <rect x="0" y="0" width="1040" height="420" fill="#0b0d11" />
+      <text x="24" y="28" fill="#e39400" font-family="IBM Plex Mono" font-size="11" letter-spacing="2">CLIENTS</text>
       <g font-family="IBM Plex Mono" font-size="11" fill="#dcd8cc">
         <rect x="24" y="44" width="150" height="36" fill="#12151c" stroke="#1e232c" />
         <text x="40" y="66">Ticket / Flatten</text>
         <rect x="186" y="44" width="130" height="36" fill="#12151c" stroke="#1e232c" />
-        <text x="204" y="66">Bot console</text>
+        <text x="204" y="66">BOT commands</text>
         <rect x="328" y="44" width="120" height="36" fill="#12151c" stroke="#1e232c" />
         <text x="350" y="66">Algos ARM</text>
         <rect x="460" y="44" width="90" height="36" fill="#12151c" stroke="#1e232c" />
         <text x="484" y="66">KILL</text>
+        <rect x="568" y="44" width="200" height="36" fill="#12151c" stroke="#e39400" />
+        <text x="588" y="66">Grok Bot  ·  MCP</text>
       </g>
-      <path d="M99 80 v28 H520 v28" fill="none" stroke="#e39400" stroke-width="1.25" />
+      <path d="M99 80 v28 H520 v24" fill="none" stroke="#e39400" stroke-width="1.25" />
       <path d="M251 80 v28" fill="none" stroke="#e39400" stroke-width="1.25" />
       <path d="M388 80 v28" fill="none" stroke="#e39400" stroke-width="1.25" />
       <path d="M505 80 v28" fill="none" stroke="#e39400" stroke-width="1.25" />
-      <rect x="400" y="136" width="240" height="52" fill="#12151c" stroke="#e39400" />
-      <text x="428" y="157" fill="#e39400" font-family="IBM Plex Mono" font-size="11" letter-spacing="1.5">sync.ts ACTION BUS</text>
-      <text x="430" y="176" fill="#7c7a70" font-family="IBM Plex Mono" font-size="10">halted? risk cap? then venue</text>
-      <path d="M520 188 v28 H200 v20" fill="none" stroke="#2ecf8a" stroke-width="1.25" />
-      <path d="M520 188 v28 H720 v20" fill="none" stroke="#ef4d4d" stroke-width="1.25" />
-      <rect x="80" y="236" width="240" height="72" fill="#12151c" stroke="#1e232c" />
-      <text x="96" y="258" fill="#2ecf8a" font-family="IBM Plex Mono" font-size="11">SIM  ·  sim.ts</text>
-      <text x="96" y="276" fill="#7c7a70" font-family="IBM Plex Mono" font-size="10">submit / match / mark</text>
-      <text x="96" y="292" fill="#7c7a70" font-family="IBM Plex Mono" font-size="10">setSim(book)</text>
-      <rect x="600" y="236" width="360" height="72" fill="#12151c" stroke="#1e232c" />
-      <text x="616" y="258" fill="#ef4d4d" font-family="IBM Plex Mono" font-size="11">ALPACA  ·  server/trade.ts</text>
-      <text x="616" y="276" fill="#7c7a70" font-family="IBM Plex Mono" font-size="10">paper-api  or  api.alpaca.markets</text>
-      <text x="616" y="292" fill="#7c7a70" font-family="IBM Plex Mono" font-size="10">then refreshAlpaca() → setAlpacaBook</text>
+      <path d="M668 80 v52" fill="none" stroke="#e39400" stroke-width="1.25" />
+      <rect x="360" y="132" width="320" height="52" fill="#12151c" stroke="#e39400" />
+      <text x="392" y="153" fill="#e39400" font-family="IBM Plex Mono" font-size="11" letter-spacing="1.5">desk-engine.ts</text>
+      <text x="392" y="172" fill="#7c7a70" font-family="IBM Plex Mono" font-size="10">halted? risk cap? then venue · log tape</text>
+      <path d="M520 184 v20 H200 v16" fill="none" stroke="#2ecf8a" stroke-width="1.25" />
+      <path d="M520 184 v20 H720 v16" fill="none" stroke="#ef4d4d" stroke-width="1.25" />
+      <path d="M520 184 v20" fill="none" stroke="#e39400" stroke-width="1.25" />
+      <rect x="80" y="220" width="240" height="64" fill="#12151c" stroke="#1e232c" />
+      <text x="96" y="242" fill="#2ecf8a" font-family="IBM Plex Mono" font-size="11">SIM  ·  sim.ts</text>
+      <text x="96" y="260" fill="#7c7a70" font-family="IBM Plex Mono" font-size="10">submit / match / mark</text>
+      <rect x="600" y="220" width="360" height="64" fill="#12151c" stroke="#1e232c" />
+      <text x="616" y="242" fill="#ef4d4d" font-family="IBM Plex Mono" font-size="11">ALPACA  ·  server/alpaca.ts</text>
+      <text x="616" y="260" fill="#7c7a70" font-family="IBM Plex Mono" font-size="10">paper-api  or  api.alpaca.markets</text>
+      <path d="M520 184 v148" fill="none" stroke="#e39400" stroke-width="1.25" />
+      <rect x="360" y="332" width="320" height="64" fill="#12151c" stroke="#1e232c" />
+      <text x="392" y="354" fill="#e39400" font-family="IBM Plex Mono" font-size="11">NEON  ·  desk_state</text>
+      <text x="392" y="372" fill="#7c7a70" font-family="IBM Plex Mono" font-size="10">owner · book · mcp_tokens · desk_kv</text>
     </svg>
-    <p class="caption">Kill disarms every strategy, cancels working orders, and optionally flattens — same path as a typed HALT.</p>
+    <p class="caption">Kill disarms every strategy, cancels working, optionally flattens — same engine path as typed HALT or MCP halt.</p>
 
-    <h2>Market plane</h2>
+    <h2>Two writers, one tape</h2>
+    <div class="grid-2">
+      <div class="card">
+        <div class="kicker">Browser</div>
+        <h3>Command tape, not a chat</h3>
+        <p class="note">
+          <code>parseCommand</code> is BUY/SELL/FLATTEN/HALT/THESIS/ARM/CLEAR. Unknown text is rejected:
+          freeform lives on the Grok Bot. <code>THESIS</code> is local indicators only. Clr / CLEAR / MCP
+          <code>bot_clear</code> wipe the tape with a <code>clearedAt</code> so hydrate cannot resurrect it.
+        </p>
+      </div>
+      <div class="card">
+        <div class="kicker">Grok Bot</div>
+        <h3>MCP tools on the owner token</h3>
+        <p class="note">
+          <code>desk_status</code>, quotes, <code>place_order</code>, flatten, halt/resume, watch, select, arm,
+          thesis, <code>bot_log</code>, <code>bot_say</code>, <code>bot_clear</code>. Settings mints an
+          <code>ndk_</code> token once. MCP is pull: the bot only runs when Grok starts a turn. Duplex wake-up
+          (automation webhook) is not built yet.
+        </p>
+      </div>
+    </div>
+
+    <h2>Hydrate and selection</h2>
+    <p class="note">
+      Shell timers: quotes 8s · Alpaca 15s · strategies 20s · <strong>desk hydrate 12s</strong>.
+      A click on watch, tape, blotter, or algos is <code>selectSymbol</code> — it persists.
+      Hydrate keeps a newer local pick if the server selected has not changed (MCP <code>select</code> still wins).
+      Persist in-flight must not apply a stale selected over a click that happened during the request.
+    </p>
     <div class="flow">
       <div class="flow-col">
         <h3>Timers in the shell</h3>
@@ -499,6 +553,7 @@
           <li>quotes · 8s</li>
           <li>Alpaca snapshot · 15s</li>
           <li>strategy tick · 20s</li>
+          <li>hydrate desk · 12s</li>
           <li>bars · on selected / range</li>
         </ul>
       </div>
@@ -523,33 +578,41 @@
       </div>
     </div>
     <p class="note" style="margin-top:12px">
-      Quote refresh also runs <code>matchWorkingOrders</code> in SIM so limit/stop tickets fill against the tape,
-      then <code>snapshotEquity</code> so the header’s day P&amp;L is the same number the blotter is marking.
+      Quote refresh still runs <code>matchWorkingOrders</code> in SIM so limit/stop tickets fill against the tape,
+      then <code>snapshotEquity</code> so the header’s day P&amp;L is the number the blotter is marking.
     </p>
 
-    <h2>Intelligence</h2>
-    <div class="grid-2">
-      <div class="card">
-        <div class="kicker">Deterministic</div>
-        <h3>Strategies stay on the client</h3>
-        <p class="note">
-          Four kinds — SMA cross, mean-reversion, breakout, momentum — evaluate on 6M bars.
-          Armed names tick every 20s, fire at most once per 15 minutes, and still go through
-          <code>placeOrder</code> / <code>flatten</code>, so Halt and risk caps apply.
-          The Algos panel is a control surface on <code>strategies[]</code>, not a second engine.
-        </p>
-      </div>
-      <div class="card">
-        <div class="kicker">Language</div>
-        <h3>Bot is a parser with a Grok overflow</h3>
-        <p class="note">
-          <code>parseCommand</code> handles BUY/SELL/FLATTEN/HALT/THESIS/ARM as structured ops.
-          Anything that does not match is <code>askDesk</code> — a server function that spends the app
-          owner’s xAI quota and returns JSON commands, which the same bus executes.
-          The console is the journal: every fill, signal, and error is a <code>botLog</code> line.
-        </p>
-      </div>
-    </div>
+    <h2>Neon schema</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Table</th>
+          <th>Role</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>user / session / account</td>
+          <td>Better Auth. Google identity. Text user ids.</td>
+        </tr>
+        <tr>
+          <td>desk_owner</td>
+          <td>Single slot. First verified user_id wins.</td>
+        </tr>
+        <tr>
+          <td>desk_state</td>
+          <td>Venue, encrypted creds, watchlist, selected, sim, strategies, bot tape (lines + clearedAt), risk, halt.</td>
+        </tr>
+        <tr>
+          <td>mcp_tokens</td>
+          <td>Hashed bearer tokens for the Grok Bot. Prefix shown once at mint.</td>
+        </tr>
+        <tr>
+          <td>desk_kv</td>
+          <td>Namespaced JSON for later features. Query-heavy data still gets its own table.</td>
+        </tr>
+      </tbody>
+    </table>
 
     <h2>Store slices ↔ surfaces</h2>
     <table>
@@ -563,12 +626,12 @@
       <tbody>
         <tr>
           <td>selected</td>
-          <td>Watch, chart, ticket, thesis, Grok context</td>
-          <td>Watch row, tape chip, blotter row, SELECT cmd</td>
+          <td>Watch, chart, ticket, thesis</td>
+          <td>selectSymbol (watch/tape/blotter/algos/SELECT), MCP select, hydrate if server changed</td>
         </tr>
         <tr>
           <td>quotes + tapeSource</td>
-          <td>Tape, watch, chart quote strip, ticket last, SIM marks</td>
+          <td>Tape, watch, chart strip, ticket last, SIM marks</td>
           <td>refreshQuotes (8s)</td>
         </tr>
         <tr>
@@ -578,37 +641,60 @@
         </tr>
         <tr>
           <td>sim / alpaca*</td>
-          <td>Header stats, blotter, ticket BP/pos — via useLiveBook</td>
-          <td>placeOrder, flatten, match, refreshAlpaca</td>
+          <td>Header, blotter, ticket — via useLiveBook</td>
+          <td>desk-engine place/flatten/match, refreshAlpaca</td>
         </tr>
         <tr>
           <td>strategies</td>
           <td>Algos panel</td>
-          <td>Arm/Disarm, tickStrategies, Kill (all disarmed)</td>
+          <td>Arm/Disarm, tickStrategies, Kill, MCP arm_strategy</td>
         </tr>
         <tr>
           <td>halted</td>
-          <td>Ticket submit, bot, strategy tick, header Halt</td>
-          <td>Kill, HALT/RESUME, daily-loss cap</td>
+          <td>Ticket, bot, strategy tick, header Halt</td>
+          <td>Kill, HALT/RESUME, daily-loss cap, MCP halt</td>
         </tr>
         <tr>
           <td>botLog</td>
           <td>Bot console</td>
-          <td>Everything that happens on the desk</td>
+          <td>Engine ops, MCP bot_say, CLEAR / bot_clear</td>
         </tr>
       </tbody>
     </table>
 
+    <h2>Intelligence</h2>
+    <div class="grid-2">
+      <div class="card">
+        <div class="kicker">Deterministic</div>
+        <h3>Strategies stay on the client tick</h3>
+        <p class="note">
+          Four kinds — SMA cross, mean-reversion, breakout, momentum — on 6M bars. Armed names tick every 20s,
+          fire at most once per 15 minutes, still through <code>placeOrder</code> / <code>flatten</code>.
+          The Algos panel is a control surface on <code>strategies[]</code>, not a second engine.
+        </p>
+      </div>
+      <div class="card">
+        <div class="kicker">Language</div>
+        <h3>Two mouths, one grammar of ops</h3>
+        <p class="note">
+          The BOT panel is a parser and a journal. The Grok Bot is the freeform operator, on MCP, with its own
+          grok.com thread. There is no nested xAI call from the desk. Answers the operator should see on glass
+          go through <code>bot_say</code>.
+        </p>
+      </div>
+    </div>
+
     <h2>What is deliberately not in the architecture</h2>
     <ul>
-      <li>No accounts, no <code>user_id</code>, no Neon. A desk is a browser.</li>
+      <li>No in-app Grok agent and no <code>ask_desk</code>. The personal Grok Bot is the language model.</li>
+      <li>No duplex wake-up. MCP does not ring Grok when you type on the tape; a webhook automation would.</li>
       <li>No WebSocket tape. Polling plus a marquee is the live feel; IEX/Yahoo are request/response.</li>
-      <li>No second store. UI flags (mobile tab, immersive, chart-focus, settings) live next to the book.</li>
-      <li>No live-venue persistence. Reloading a live session falls back to paper keys still in storage.</li>
+      <li>No multi-user blotter. One owner slot. <code>desk_kv</code> is for future features, not a second product.</li>
+      <li>No live-venue persistence in the browser cache. Reloading a live session falls back to paper in <code>localStorage</code>; Neon still has the encrypted keys.</li>
     </ul>
 
     <footer>
-      NIGHTDESK · architecture as of the looping-tape desk · tokens #050608 / #e39400 / IBM Plex
+      NIGHTDESK · architecture as of Google owner + Neon + MCP Grok Bot · tokens #050608 / #e39400 / IBM Plex
     </footer>
   </div>
 
@@ -616,51 +702,51 @@
     const PANELS = {
       header: {
         title: "Header bar",
-        body: "Process chrome. Venue (SIM / PAPER / LIVE), tape source (IEX / YH / MIX / SEED), NYSE session LED, equity / cash / day P&L from useLiveBook(), Kill, fullscreen, settings. Not a trading surface — a status rail.",
-        read: ["venue", "tapeSource", "account via useLiveBook", "halted", "immersive", "chartFocus"],
-        write: ["killSwitch → halted + disarm", "setImmersive", "setSettingsOpen"],
+        body: "Process chrome. Venue, tape source, NYSE session LED, equity / cash / day from useLiveBook(), Kill, fullscreen, settings, operator chip (sign out). Not a trading surface — a status rail.",
+        read: ["venue", "tapeSource", "account via useLiveBook", "halted", "immersive", "chartFocus", "session user"],
+        write: ["killSwitch → desk-engine halt", "setImmersive", "setSettingsOpen", "signOut"],
       },
       tape: {
         title: "Ticker tape",
-        body: "Projection of watchlist ∩ quotes. Fills copies until the strip covers the viewport, then animates translateX(-50%) so the last symbol meets the first. Clicking a chip writes selected.",
+        body: "Projection of watchlist ∩ quotes. Fills copies until the strip covers the viewport, then animates translateX(-50%) so the last symbol meets the first. Clicking a chip is selectSymbol — persist, do not wait for hydrate.",
         read: ["watchlist", "quotes"],
-        write: ["setSelected"],
+        write: ["selectSymbol → selected + queuePersist"],
       },
       watch: {
         title: "Watch",
         body: "The symbol universe the tape and selection share. Adding a name also selects it and triggers a quote refresh. The elevated row is selected, not hovered.",
         read: ["watchlist", "quotes", "selected"],
-        write: ["setSelected", "addWatch / rmWatch"],
+        write: ["selectSymbol", "addWatch / rmWatch"],
       },
       chart: {
         title: "Candle chart",
-        body: "Bars for selected at barRange. Quote strip is last/change from quotes; position overlay comes from useLiveBook(). Thesis runs local indicators (and Grok if keyed). F focuses this panel.",
+        body: "Bars for selected at barRange. Quote strip is last/change from quotes; position overlay comes from useLiveBook(). Thesis is local indicators only. F focuses this panel.",
         read: ["selected", "quotes", "bars", "barRange", "positions"],
         write: ["setBarRange", "toggleChartFocus", "runThesis → botLog"],
       },
       ticket: {
         title: "Order ticket",
-        body: "Always bound to selected. Estimates notional from last (or limit). Submit is placeOrder; Flatten is flatten(selected). Disabled when halted. Live venue confirms in the browser first.",
+        body: "Always bound to selected. Estimates notional from last (or limit). Submit is desk-engine place_order; Flatten is flatten(selected). Disabled when halted. Live venue confirms in the browser first.",
         read: ["selected", "quotes", "risk", "halted", "account", "positions"],
         write: ["placeOrder", "flatten"],
       },
       blotter: {
         title: "Blotter",
-        body: "The live book, venue-switched. SIM marks positions to last quotes; Alpaca is the last snapshot. Row click selects. X flattens that name. Working orders can cancel.",
+        body: "The live book, venue-switched. SIM marks positions to last quotes; Alpaca is the last snapshot. Row click selects and persists. X flattens that name.",
         read: ["useLiveBook() positions / orders"],
-        write: ["setSelected", "flatten", "cancelOrder"],
+        write: ["selectSymbol", "flatten", "cancelOrder"],
       },
       algos: {
         title: "Algos",
-        body: "Four strategy instances in the store. Arm is a boolean; the shell ticks armed names every 20s against 6M bars. Signals still enter through placeOrder / flatten.",
+        body: "Four strategy instances in the store. Arm is a boolean; the shell ticks armed names every 20s against 6M bars. Signals still enter through placeOrder / flatten. Clicking a name selects it.",
         read: ["strategies", "bars (if same symbol)"],
-        write: ["patchStrategy.armed", "tickStrategies"],
+        write: ["patchStrategy.armed", "tickStrategies", "selectSymbol"],
       },
       bot: {
         title: "Bot console",
-        body: "The journal plus a command line. Structured grammar first; unmatched text goes to askDesk (Grok) and comes back as the same ops the ticket uses. botLog is capped at 200 lines.",
+        body: "Command tape and journal — not a chat. Structured grammar first. Unknown text points at the Grok Bot. CLEAR / Clr / MCP bot_clear wipe with clearedAt. MCP bot_say lands here on the next hydrate (~12s).",
         read: ["botLog", "halted"],
-        write: ["runConsole → parseCommand | askDesk", "every other action logs here"],
+        write: ["runConsole → parseCommand", "bot_say / bot_clear", "engine logs"],
       },
     };
 
