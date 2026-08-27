@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { executeDeskOp, type DeskOp } from "@/lib/server/desk-engine";
+import { captureAlpacaBook } from "@/lib/server/desk-ledger";
 import { claimOwner, loadDesk, publicDesk, requireOwner, type DeskSnapshot } from "@/lib/server/desk-store";
 import { createMcpToken, listMcpTokens, revokeMcpToken } from "@/lib/server/mcp-token.server";
 
@@ -38,6 +39,22 @@ export const runDeskOp = createServerFn({ method: "POST" })
       message: result.message ?? null,
       extra: result.extra ?? null,
       desk: publicDesk(result.desk),
+    };
+  });
+
+export const refreshAlpacaBook = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .handler(async ({ context }) => {
+    await requireOwner(context.userId);
+    const desk = await loadDesk(context.userId);
+    const book = await captureAlpacaBook(context.userId, desk);
+    if (!book) return { ok: false as const, error: "No Alpaca book" };
+    return {
+      ok: true as const,
+      account: book.account,
+      positions: book.positions,
+      orders: book.orders,
+      pulledAt: book.pulledAt,
     };
   });
 

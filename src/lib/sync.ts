@@ -12,19 +12,11 @@ import {
   submitSimOrder,
 } from "@/lib/sim";
 import { fetchBars, fetchQuotes } from "@/lib/server/market";
-import {
-  cancelAllAlpaca,
-  cancelAlpacaOrder,
-  closeAllAlpaca,
-  closeAlpacaPosition,
-  fetchAccountSnapshot,
-  pingAlpaca,
-  submitAlpacaOrder,
-} from "@/lib/server/trade";
-import { runDeskOp } from "@/lib/server/desk-api";
+import { pingAlpaca } from "@/lib/server/trade";
+import { refreshAlpacaBook, runDeskOp } from "@/lib/server/desk-api";
 import { applyPulledDesk, queuePersist, selectSymbol } from "@/lib/desk-sync";
 import { selectAccount, selectPositions, useDesk } from "@/lib/store";
-import type { OrderRequest, Venue } from "@/lib/types";
+import type { Account, Order, OrderRequest, Position, Venue } from "@/lib/types";
 
 function unique(xs: string[]) {
   return [...new Set(xs.filter(Boolean))];
@@ -84,14 +76,31 @@ export async function refreshBars() {
   }
 }
 
+function applyAlpacaExtra(extra?: {
+  account?: Account;
+  positions?: Position[];
+  orders?: Order[];
+} | null) {
+  if (!extra?.account || !extra.positions) return false;
+  useDesk.getState().setAlpacaBook({
+    account: extra.account,
+    positions: extra.positions,
+    orders: extra.orders ?? useDesk.getState().alpacaOrders,
+  });
+  return true;
+}
+
 export async function refreshAlpaca() {
   const s = useDesk.getState();
   if (s.venue === "sim" || !s.creds) return;
   try {
-    const snap = await fetchAccountSnapshot({
-      data: { venue: s.venue, creds: s.creds },
+    const snap = await refreshAlpacaBook();
+    if (!snap.ok) throw new Error(snap.error);
+    useDesk.getState().setAlpacaBook({
+      account: snap.account,
+      positions: snap.positions,
+      orders: snap.orders,
     });
-    useDesk.getState().setAlpacaBook(snap);
   } catch (err) {
     useDesk.getState().log("err", err instanceof Error ? err.message : "Alpaca snapshot failed");
   }
@@ -149,27 +158,16 @@ export async function placeOrder(req: OrderRequest): Promise<{ ok: boolean; erro
     s.log("err", "Connect Alpaca keys in Settings.");
     return { ok: false, error: "No keys" };
   }
-  const res = await submitAlpacaOrder({
-    data: {
-      venue: s.venue,
-      creds: s.creds,
-      symbol: req.symbol,
-      side: req.side,
-      type: req.type,
-      qty: req.qty,
-      tif: req.tif,
-      limitPrice: req.limitPrice,
-      stopPrice: req.stopPrice,
-    },
-  });
-  if (!res.ok) {
-    s.log("err", res.error);
-    toast.error(res.error);
-    return { ok: false, error: res.error };
+  const result = await runDeskOp({ data: { op: "place_order", request: req } });
+  if (!result.ok) {
+    const msg = result.error ?? "Order failed";
+    useDesk.getState().log("err", msg);
+    toast.error(msg);
+    return { ok: false, error: msg };
   }
-  s.log("sys", `ACK ${res.order.side.toUpperCase()} ${res.order.qty} ${res.order.symbol}`);
-  await refreshAlpaca();
-  queuePersist();
+  if (result.desk) applyPulledDesk(result.desk);
+  if (!applyAlpacaExtra(result.extra)) await refreshAlpaca();
+  if (result.extra?.order?.status === "filled" && result.message) toast.success(result.message);
   return { ok: true };
 }
 
@@ -182,11 +180,10 @@ export async function cancelOrder(id: string) {
     return;
   }
   if (!s.creds) return;
-  const res = await cancelAlpacaOrder({ data: { venue: s.venue, creds: s.creds, id } });
-  if (!res.ok) s.log("err", res.error);
-  else s.log("sys", `Canceled ${id}`);
-  await refreshAlpaca();
-  queuePersist();
+  const result = await runDeskOp({ data: { op: "cancel", id } });
+  if (!result.ok) useDesk.getState().log("err", result.error ?? "Cancel failed");
+  if (result.desk) applyPulledDesk(result.desk);
+  if (!applyAlpacaExtra(result.extra)) await refreshAlpaca();
 }
 
 export async function killSwitch(flattenBook: boolean) {
@@ -198,9 +195,11 @@ export async function killSwitch(flattenBook: boolean) {
     if (flattenBook) book = flattenAll(book, s.quotes, "bot").book;
     s.setSim(book);
   } else if (s.creds) {
-    await cancelAllAlpaca({ data: { venue: s.venue, creds: s.creds } });
-    if (flattenBook) await closeAllAlpaca({ data: { venue: s.venue, creds: s.creds } });
-    await refreshAlpaca();
+    const result = await runDeskOp({ data: { op: "halt", flatten: flattenBook } });
+    if (result.desk) applyPulledDesk(result.desk);
+    if (!applyAlpacaExtra(result.extra)) await refreshAlpaca();
+    toast.error("Kill switch engaged");
+    return;
   }
   s.log(
     "err",
@@ -230,17 +229,10 @@ export async function flatten(symbol?: string) {
     return;
   }
   if (!s.creds) return;
-  if (!symbol) {
-    const r = await closeAllAlpaca({ data: { venue: s.venue, creds: s.creds } });
-    if (!r.ok) s.log("err", r.error);
-    else s.log("sys", "Flattened all");
-  } else {
-    const r = await closeAlpacaPosition({ data: { venue: s.venue, creds: s.creds, symbol } });
-    if (!r.ok) s.log("err", r.error);
-    else s.log("sys", `Flattened ${symbol}`);
-  }
-  await refreshAlpaca();
-  queuePersist();
+  const result = await runDeskOp({ data: { op: "flatten", symbol } });
+  if (!result.ok) useDesk.getState().log("err", result.error ?? "Flatten failed");
+  if (result.desk) applyPulledDesk(result.desk);
+  if (!applyAlpacaExtra(result.extra)) await refreshAlpaca();
 }
 
 export async function connectAlpaca(venue: Venue, keyId: string, secret: string) {
@@ -390,9 +382,16 @@ export async function runConsole(raw: string) {
     return;
   }
   if (cmd.op === "resume") {
-    s.setHalted(false);
-    s.log("sys", "Desk resumed");
-    queuePersist();
+    if (s.venue === "sim") {
+      s.setHalted(false);
+      s.log("sys", "Desk resumed");
+      queuePersist();
+      return;
+    }
+    const result = await runDeskOp({ data: { op: "resume" } });
+    if (!result.ok) useDesk.getState().log("err", result.error ?? "Resume failed");
+    if (result.desk) applyPulledDesk(result.desk);
+    if (!applyAlpacaExtra(result.extra)) await refreshAlpaca();
     return;
   }
   if (cmd.op === "flatten") {
@@ -400,10 +399,16 @@ export async function runConsole(raw: string) {
     return;
   }
   if (cmd.op === "cancel") {
-    if (s.venue === "sim") s.setSim(cancelAllSim(s.sim));
-    else if (s.creds) await cancelAllAlpaca({ data: { venue: s.venue, creds: s.creds } });
-    s.log("sys", "Canceled working");
-    queuePersist();
+    if (s.venue === "sim") {
+      s.setSim(cancelAllSim(s.sim));
+      s.log("sys", "Canceled working");
+      queuePersist();
+      return;
+    }
+    const result = await runDeskOp({ data: { op: "cancel" } });
+    if (!result.ok) useDesk.getState().log("err", result.error ?? "Cancel failed");
+    if (result.desk) applyPulledDesk(result.desk);
+    if (!applyAlpacaExtra(result.extra)) await refreshAlpaca();
     return;
   }
   if (cmd.op === "thesis") {

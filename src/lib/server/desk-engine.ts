@@ -9,6 +9,7 @@ import {
 } from "@/lib/server/alpaca";
 import { mergeBotTapes } from "@/lib/bot-log";
 import { loadBars, loadQuotes } from "@/lib/server/market";
+import { captureAlpacaBook, recordDeskEvent } from "@/lib/server/desk-ledger";
 import { loadDesk, saveDesk, type DeskSnapshot } from "@/lib/server/desk-store";
 import { localThesis } from "@/lib/indicators";
 import {
@@ -25,6 +26,7 @@ import {
 import type {
   Account,
   BotLine,
+  Order,
   OrderRequest,
   Position,
   RiskSettings,
@@ -124,6 +126,7 @@ export type DeskOpExtra = {
   account?: Account;
   positions?: Position[];
   order?: { id: string; symbol: string; side: string; qty: number; status: string };
+  orders?: Order[];
   venue?: Venue;
   halted?: boolean;
   selected?: string;
@@ -428,11 +431,44 @@ async function runOp(desk: DeskSnapshot, op: DeskOp): Promise<DeskOpResult> {
   return { ok: false, error: "Unknown op", desk };
 }
 
+function mutatesAlpaca(op: DeskOp) {
+  return (
+    op.op === "place_order" ||
+    op.op === "flatten" ||
+    op.op === "cancel" ||
+    op.op === "halt" ||
+    op.op === "resume" ||
+    op.op === "set_venue"
+  );
+}
+
 export async function executeDeskOp(userId: string, op: DeskOp): Promise<DeskOpResult> {
   const desk = await loadDesk(userId);
   const result = await runOp(desk, op);
   const saved = await saveDesk(userId, result.desk);
-  return { ...result, desk: saved };
+  let extra = result.extra;
+  if (result.ok && extra?.order) {
+    await recordDeskEvent({
+      userId,
+      venue: saved.venue,
+      kind: extra.order.status === "filled" ? "fill" : "ack",
+      symbol: extra.order.symbol,
+      id: `${extra.order.status}:${extra.order.id}`,
+      payload: extra.order,
+    }).catch(() => undefined);
+  }
+  if (result.ok && mutatesAlpaca(op) && saved.venue !== "sim") {
+    const book = await captureAlpacaBook(userId, saved).catch(() => null);
+    if (book) {
+      extra = {
+        ...extra,
+        account: book.account,
+        positions: book.positions,
+        orders: book.orders,
+      };
+    }
+  }
+  return { ...result, desk: saved, extra };
 }
 
 export async function quotesForDesk(userId: string, symbols?: string[]) {
