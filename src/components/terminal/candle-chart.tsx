@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type TouchEvent } from "react";
 import { Expand, Shrink } from "lucide-react";
 import { sma, closes } from "@/lib/indicators";
+import { normalizeBars } from "@/lib/bar-window";
 import { barTime, pct, px, signClass, signedMoney } from "@/lib/format";
 import { nameOf } from "@/lib/universe";
 import { useDesk, useLiveBook } from "@/lib/store";
@@ -121,6 +122,7 @@ function ChartSvg({ bars, range, last }: { bars: Bar[]; range: BarRange; last?: 
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [hover, setHover] = useState<number | null>(null);
   const intraday = range === "1D" || range === "5D";
+  const series = useMemo(() => normalizeBars(bars), [bars]);
 
   useEffect(() => {
     const parent = wrap.current;
@@ -138,7 +140,7 @@ function ChartSvg({ bars, range, last }: { bars: Bar[]; range: BarRange; last?: 
 
   const layout = useMemo(() => {
     const { w, h } = size;
-    if (w < 8 || h < 8 || bars.length === 0) return null;
+    if (w < 8 || h < 8 || series.length === 0) return null;
     const padL = 8;
     const padR = 52;
     const padT = 14;
@@ -146,18 +148,19 @@ function ChartSvg({ bars, range, last }: { bars: Bar[]; range: BarRange; last?: 
     const volH = Math.max(28, h * 0.18);
     const plotH = h - padT - padB - volH - 6;
     const plotW = w - padL - padR;
-    const cs = closes(bars);
+    const cs = closes(series);
     const s20 = sma(cs, 20);
     const s50 = sma(cs, 50);
-    const hi = Math.max(...bars.map((b) => b.h), last ?? 0);
-    const lo = Math.min(...bars.map((b) => b.l), last ?? hi);
-    const span = hi - lo || 1;
+    const lastPx = typeof last === "number" && Number.isFinite(last) ? last : undefined;
+    const hi = Math.max(...series.map((b) => b.h), lastPx ?? Number.NEGATIVE_INFINITY);
+    const lo = Math.min(...series.map((b) => b.l), lastPx ?? Number.POSITIVE_INFINITY);
+    const span = (Number.isFinite(hi) && Number.isFinite(lo) ? hi - lo : 0) || 1;
     const min = lo - span * 0.04;
     const max = hi + span * 0.04;
-    const maxV = Math.max(...bars.map((b) => b.v), 1);
-    const xAt = (i: number) => padL + ((i + 0.5) / bars.length) * plotW;
+    const maxV = Math.max(...series.map((b) => b.v), 1);
+    const xAt = (i: number) => padL + ((i + 0.5) / series.length) * plotW;
     const yAt = (p: number) => padT + ((max - p) / (max - min)) * plotH;
-    const candleW = Math.max(1.5, (plotW / bars.length) * 0.7);
+    const candleW = Math.max(1.5, (plotW / series.length) * 0.7);
     const maPath = (arr: number[]) => {
       const pts: string[] = [];
       for (let i = 0; i < arr.length; i++) {
@@ -185,17 +188,17 @@ function ChartSvg({ bars, range, last }: { bars: Bar[]; range: BarRange; last?: 
       s20: maPath(s20),
       s50: maPath(s50),
       priceTicks: ticks(min, max, 5),
-      timeStep: Math.max(1, Math.floor(bars.length / 5)),
+      timeStep: Math.max(1, Math.floor(series.length / 5)),
     };
-  }, [bars, last, size]);
+  }, [series, last, size]);
 
   function onMove(e: MouseEvent<SVGSVGElement> | TouchEvent<SVGSVGElement>) {
-    if (!layout || bars.length === 0) return;
+    if (!layout || series.length === 0) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const clientX = "touches" in e ? (e.touches[0]?.clientX ?? 0) : e.clientX;
     const x = clientX - rect.left;
-    const i = Math.round(((x - layout.padL) / layout.plotW) * bars.length - 0.5);
-    setHover(Math.max(0, Math.min(bars.length - 1, i)));
+    const i = Math.round(((x - layout.padL) / layout.plotW) * series.length - 0.5);
+    setHover(Math.max(0, Math.min(series.length - 1, i)));
   }
 
   return (
@@ -235,7 +238,7 @@ function ChartSvg({ bars, range, last }: { bars: Bar[]; range: BarRange; last?: 
               </g>
             );
           })}
-          {bars.map((b, i) => {
+          {series.map((b, i) => {
             const x = layout.xAt(i);
             const bull = b.c >= b.o;
             const y1 = layout.yAt(Math.max(b.o, b.c));
@@ -292,7 +295,7 @@ function ChartSvg({ bars, range, last }: { bars: Bar[]; range: BarRange; last?: 
               </text>
             </>
           ) : null}
-          {bars.map((b, i) =>
+          {series.map((b, i) =>
             i % layout.timeStep === 0 ? (
               <text
                 key={`t-${b.t}`}
@@ -306,7 +309,7 @@ function ChartSvg({ bars, range, last }: { bars: Bar[]; range: BarRange; last?: 
               </text>
             ) : null,
           )}
-          {hover !== null && bars[hover] ? (
+          {hover !== null && series[hover] ? (
             <>
               <line
                 x1={layout.xAt(hover)}
@@ -319,12 +322,12 @@ function ChartSvg({ bars, range, last }: { bars: Bar[]; range: BarRange; last?: 
                 x={layout.xAt(hover)}
                 maxW={layout.w - layout.padR}
                 padL={layout.padL}
-                text={`${barTime(bars[hover].t, intraday)}  O ${px(bars[hover].o)}  H ${px(bars[hover].h)}  L ${px(bars[hover].l)}  C ${px(bars[hover].c)}`}
+                text={`${barTime(series[hover].t, intraday)}  O ${px(series[hover].o)}  H ${px(series[hover].h)}  L ${px(series[hover].l)}  C ${px(series[hover].c)}`}
               />
             </>
           ) : null}
         </svg>
-      ) : bars.length === 0 ? (
+      ) : series.length === 0 ? (
         <div className="flex h-full items-center justify-center font-mono text-micro text-subtle">
           No bars
         </div>

@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { authMiddleware } from "@/lib/auth/middleware";
+import { clipBarsForRange, rangeWindow } from "@/lib/bar-window";
 import { loadDesk } from "@/lib/server/desk-store";
 import { nameOf, SEED } from "@/lib/universe";
 import type { Bar, BarRange, BarSource, Creds, Quote, TapeSource, Venue } from "@/lib/types";
@@ -315,19 +316,41 @@ async function yahooBars(symbol: string, range: BarRange): Promise<Bar[]> {
 async function alpacaBars(symbol: string, range: BarRange, creds: Creds): Promise<Bar[] | null> {
   try {
     const spec = RANGE[range];
-    const limit = range === "1D" ? 200 : range === "5D" ? 200 : 300;
-    const url = `https://data.alpaca.markets/v2/stocks/${encodeURIComponent(symbol)}/bars?timeframe=${spec.alpaca}&limit=${limit}&adjustment=split&feed=iex`;
-    const body = (await getJson(url, alpacaHeaders(creds))) as {
-      bars?: Array<{ t: string; o: number; h: number; l: number; c: number; v: number }>;
-    };
-    const bars = (body.bars ?? []).map((b) => ({
-      t: Date.parse(b.t),
-      o: b.o,
-      h: b.h,
-      l: b.l,
-      c: b.c,
-      v: b.v,
-    }));
+    // Alpaca defaults `start` to today 00:00 ET. Limit-only 1M/6M/1Y requests
+    // therefore return 0–1 daily bars and the chart collapses to a single candle.
+    const { start, end } = rangeWindow(range);
+    const collected: Bar[] = [];
+    let page: string | undefined;
+    for (let i = 0; i < 5; i++) {
+      const params = new URLSearchParams({
+        timeframe: spec.alpaca,
+        start,
+        end,
+        limit: "10000",
+        adjustment: "split",
+        feed: "iex",
+        sort: "asc",
+      });
+      if (page) params.set("page_token", page);
+      const url = `https://data.alpaca.markets/v2/stocks/${encodeURIComponent(symbol)}/bars?${params}`;
+      const body = (await getJson(url, alpacaHeaders(creds))) as {
+        bars?: Array<{ t: string; o: number; h: number; l: number; c: number; v: number }>;
+        next_page_token?: string | null;
+      };
+      for (const b of body.bars ?? []) {
+        collected.push({
+          t: Date.parse(b.t),
+          o: Number(b.o),
+          h: Number(b.h),
+          l: Number(b.l),
+          c: Number(b.c),
+          v: Number(b.v),
+        });
+      }
+      if (!body.next_page_token) break;
+      page = body.next_page_token;
+    }
+    const bars = clipBarsForRange(collected, range);
     return bars.length ? bars : null;
   } catch {
     return null;
