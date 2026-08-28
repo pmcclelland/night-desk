@@ -104,8 +104,15 @@ export function CandleChart() {
             {barsSource === "alpaca" ? "  IEX" : barsSource === "yahoo" ? "  YH" : ""}
           </span>
         ) : null}
-        <div className="flex shrink-0 items-center self-center" role="group" aria-label="Chart mode">
-          {MODES.map((m) => (
+        {pos ? (
+          <span className={cn("ml-auto font-mono text-micro tabular-nums", signClass(pos.unrealizedPl))}>
+            POS {pos.qty}  {signedMoney(pos.unrealizedPl)}
+          </span>
+        ) : null}
+      </div>
+      <div className="flex h-7 shrink-0 items-center border-b border-border px-3">
+        <div role="group" aria-label="Chart mode" className="flex items-center">
+          {MODES.map((m, i) => (
             <button
               key={m.id}
               type="button"
@@ -113,6 +120,7 @@ export function CandleChart() {
               aria-pressed={chartMode === m.id}
               className={cn(
                 "h-6 px-1.5 font-mono text-micro tracking-wide",
+                i > 0 && "border-l border-border",
                 chartMode === m.id ? "text-accent" : "text-subtle hover:text-fg",
               )}
             >
@@ -120,11 +128,6 @@ export function CandleChart() {
             </button>
           ))}
         </div>
-        {pos ? (
-          <span className={cn("ml-auto font-mono text-micro tabular-nums", signClass(pos.unrealizedPl))}>
-            POS {pos.qty}  {signedMoney(pos.unrealizedPl)}
-          </span>
-        ) : null}
       </div>
       <div className="relative min-h-0 flex-1">
         {loading && bars.length === 0 ? (
@@ -212,11 +215,6 @@ function ChartSvg({
         ? endC >= firstC
         : true;
     const linePath = pathThrough(cs);
-    const lastI = series.length - 1;
-    const areaPath =
-      series.length > 1 && linePath
-        ? `${linePath} L${xAt(lastI).toFixed(1)} ${(padT + plotH).toFixed(1)} L${xAt(0).toFixed(1)} ${(padT + plotH).toFixed(1)} Z`
-        : "";
     return {
       w,
       h,
@@ -235,8 +233,6 @@ function ChartSvg({
       line,
       lineUp,
       linePath,
-      areaPath,
-      lastI,
       s20: line ? "" : pathThrough(sma(cs, 20)),
       s50: line ? "" : pathThrough(sma(cs, 50)),
       priceTicks: ticks(min, max, 5),
@@ -292,20 +288,6 @@ function ChartSvg({
           })}
           {layout.line ? (
             <>
-              <defs>
-                <linearGradient id="nd-line-fill" x1="0" y1="0" x2="0" y2="1">
-                  <stop
-                    offset="0%"
-                    stopColor={layout.lineUp ? "var(--color-up)" : "var(--color-down)"}
-                    stopOpacity="0.28"
-                  />
-                  <stop
-                    offset="100%"
-                    stopColor={layout.lineUp ? "var(--color-up)" : "var(--color-down)"}
-                    stopOpacity="0"
-                  />
-                </linearGradient>
-              </defs>
               {series.map((b, i) => {
                 const vh = (b.v / layout.maxV) * layout.volH;
                 return (
@@ -319,22 +301,13 @@ function ChartSvg({
                   />
                 );
               })}
-              {layout.areaPath ? <path d={layout.areaPath} fill="url(#nd-line-fill)" /> : null}
               <path
                 d={layout.linePath}
                 className={cn("fill-none", layout.lineUp ? "stroke-up" : "stroke-down")}
-                strokeWidth="1.6"
+                strokeWidth="1"
                 strokeLinejoin="round"
                 strokeLinecap="round"
               />
-              {series[layout.lastI] ? (
-                <circle
-                  cx={layout.xAt(layout.lastI)}
-                  cy={layout.yAt(series[layout.lastI]!.c)}
-                  r="2.5"
-                  className={layout.lineUp ? "fill-up" : "fill-down"}
-                />
-              ) : null}
             </>
           ) : (
             <>
