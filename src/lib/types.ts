@@ -6,6 +6,8 @@ export type BarSource = "alpaca" | "yahoo" | "seed";
 
 export type BarRange = "1D" | "5D" | "1M" | "6M" | "1Y";
 
+export type ChartMode = "candles" | "line";
+
 export type OrderSide = "buy" | "sell";
 export type OrderType = "market" | "limit" | "stop";
 export type TimeInForce = "day" | "gtc" | "ioc";
