@@ -14,7 +14,7 @@ A dark-room desk for watching tape, charting, sending orders, and arming simple 
 
 - **Tape** — scrolling last/change for the watchlist
 - **Watch** — last, change, volume; click a symbol to load the chart
-- **Chart** — candles with SMA overlays, 1D / 5D / 1M / 6M / 1Y
+- **Chart** — candles with SMA overlays, or a close-price line; 1D / 5D / 1M / 6M / 1Y
 - **Ticket** — market, limit, stop; DAY / GTC / IOC; flatten
 - **Blotter** — positions and working orders
 - **Algos** — SMA cross, mean reversion, breakout, momentum; arm or disarm per symbol

@@ -16,6 +16,7 @@ import type {
   Bar,
   BarRange,
   BarSource,
+  ChartMode,
   BotLine,
   Creds,
   Order,
@@ -57,6 +58,7 @@ export interface DeskState {
   bars: Bar[];
   barsSymbol: string;
   barRange: BarRange;
+  chartMode: ChartMode;
   barsSource: BarSource;
   barsLoading: boolean;
   sim: SimBook;
@@ -78,6 +80,7 @@ export interface DeskState {
   setConnected: (ok: boolean, error?: string | null) => void;
   setSelected: (s: string) => void;
   setBarRange: (r: BarRange) => void;
+  setChartMode: (m: ChartMode) => void;
   setQuotes: (q: Record<string, Quote>, source?: TapeSource) => void;
   setBars: (symbol: string, bars: Bar[], source?: BarSource) => void;
   setBarsLoading: (v: boolean) => void;
@@ -137,6 +140,7 @@ export const useDesk = create<DeskState>()(
       bars: seedBars("AAPL"),
       barsSymbol: "AAPL",
       barRange: "1M",
+      chartMode: "candles",
       barsSource: "seed",
       barsLoading: false,
       sim: createStarterBook(),
@@ -158,6 +162,7 @@ export const useDesk = create<DeskState>()(
       setConnected: (ok, error = null) => set({ connected: ok, connectError: error ?? null }),
       setSelected: (s) => set({ selected: s.toUpperCase() }),
       setBarRange: (r) => set({ barRange: r }),
+      setChartMode: (m) => set({ chartMode: m }),
       setQuotes: (q, source) =>
         set({ quotes: { ...get().quotes, ...q }, ...(source ? { tapeSource: source } : {}) }),
       setBars: (symbol, bars, source) =>
@@ -225,6 +230,7 @@ export const useDesk = create<DeskState>()(
         watchlist: s.watchlist,
         selected: s.selected,
         barRange: s.barRange,
+        chartMode: s.chartMode,
         sim: s.sim,
         strategies: s.strategies,
         botLog: s.botLog.slice(-80),
