@@ -6,9 +6,15 @@ import { useDesk, useLiveBook } from "@/lib/store";
 import { killSwitch } from "@/lib/sync";
 import { signOut } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
+import { QuietPair } from "@/components/terminal/quiet-pair";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import type { TapeSource } from "@/lib/types";
+
+const FEED: { id: boolean; label: "SNAP" | "LIVE" }[] = [
+  { id: false, label: "SNAP" },
+  { id: true, label: "LIVE" },
+];
 
 const VENUE: Record<string, string> = {
   sim: "SIM",
@@ -34,6 +40,8 @@ export function HeaderBar() {
   const setImmersive = useDesk((s) => s.setImmersive);
   const setChartFocus = useDesk((s) => s.setChartFocus);
   const { account } = useLiveBook();
+  const liveData = useDesk((s) => s.liveData);
+  const setLiveData = useDesk((s) => s.setLiveData);
   const openSettings = useDesk((s) => s.setSettingsOpen);
   const tape = TAPE[tapeSource];
   const alpacaVenue = venue !== "sim";
@@ -103,18 +111,26 @@ export function HeaderBar() {
           )}
         </div>
 
-        <Stat label="EQ" value={money(account.equity, true)} />
+        <Stat label="EQ" value={money(account.equity, true)} className="hidden sm:flex" />
         <Stat label="CASH" value={money(account.cash, true)} className="hidden sm:flex" />
         <Stat
           label="DAY"
           value={`${signedMoney(account.dayPl)} ${pct(account.dayPlPct)}`}
           valueClass={signClass(account.dayPl)}
+          className="shrink-0"
+        />
+
+        <QuietPair
+          ariaLabel="Feed"
+          value={liveData}
+          options={FEED}
+          onChange={setLiveData}
         />
 
         <Button
           variant="halt"
           size="sm"
-          className="hidden md:inline-flex"
+          className="ml-1 hidden md:inline-flex md:ml-2"
           onClick={() => void killSwitch(false)}
         >
           <Power className="size-3" />
