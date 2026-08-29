@@ -12,6 +12,7 @@ import { StrategyLab } from "@/components/terminal/strategy-lab";
 import { SettingsDialog } from "@/components/terminal/settings-dialog";
 import { useIsDesktop } from "@/lib/hooks";
 import { useDesk, type MobileTab } from "@/lib/store";
+import { attachLiveFeed, browserClock } from "@/lib/live-feed";
 import { refreshAlpaca, refreshBars, refreshQuotes, tickStrategies } from "@/lib/sync";
 import { hydrateDesk } from "@/lib/desk-sync";
 import {
@@ -44,6 +45,7 @@ export function TerminalShell() {
   const setMobileTab = useDesk((s) => s.setMobileTab);
   const immersive = useDesk((s) => s.immersive);
   const chartFocus = useDesk((s) => s.chartFocus);
+  const liveData = useDesk((s) => s.liveData);
   const rootRef = useRef<HTMLDivElement>(null);
 
   const live = useRef(false);
@@ -67,34 +69,18 @@ export function TerminalShell() {
   }, [selected, barRange]);
 
   useEffect(() => {
-    const unlessHidden = (fn: () => void) => {
-      if (typeof document !== "undefined" && document.hidden) return;
-      fn();
-    };
-    const q = window.setInterval(() => unlessHidden(() => void refreshQuotes()), 8000);
-    const a = window.setInterval(
-      () =>
-        unlessHidden(() => {
-          if (useDesk.getState().venue !== "sim") void refreshAlpaca();
-        }),
-      15000,
+    if (!liveData) return;
+    return attachLiveFeed(
+      {
+        refreshQuotes: () => void refreshQuotes(),
+        refreshAlpaca: () => void refreshAlpaca(),
+        tickStrategies: () => void tickStrategies(),
+        hydrateDesk: () => void hydrateDesk(),
+        isSim: () => useDesk.getState().venue === "sim",
+      },
+      browserClock(),
     );
-    const s = window.setInterval(() => unlessHidden(() => void tickStrategies()), 20000);
-    const p = window.setInterval(() => unlessHidden(() => void hydrateDesk()), 30000);
-    const onVis = () => {
-      if (document.hidden) return;
-      void refreshQuotes();
-      if (useDesk.getState().venue !== "sim") void refreshAlpaca();
-    };
-    document.addEventListener("visibilitychange", onVis);
-    return () => {
-      window.clearInterval(q);
-      window.clearInterval(a);
-      window.clearInterval(s);
-      window.clearInterval(p);
-      document.removeEventListener("visibilitychange", onVis);
-    };
-  }, []);
+  }, [liveData]);
 
   useEffect(() => {
     return subscribeFullscreen(() => {

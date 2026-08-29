@@ -12,9 +12,13 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 
 const RANGES: BarRange[] = ["1D", "5D", "1M", "6M", "1Y"];
-const MODES: { id: ChartMode; label: string }[] = [
+const MODES: { id: ChartMode; label: "OHLC" | "LINE" }[] = [
   { id: "candles", label: "OHLC" },
   { id: "line", label: "LINE" },
+];
+const LIVE: { id: boolean; label: "LIVE" | "OFF" }[] = [
+  { id: true, label: "LIVE" },
+  { id: false, label: "OFF" },
 ];
 
 function niceNum(range: number, round: boolean) {
@@ -50,6 +54,8 @@ export function CandleChart() {
   const setBarRange = useDesk((s) => s.setBarRange);
   const chartMode = useDesk((s) => s.chartMode);
   const setChartMode = useDesk((s) => s.setChartMode);
+  const liveData = useDesk((s) => s.liveData);
+  const setLiveData = useDesk((s) => s.setLiveData);
   const loading = useDesk((s) => s.barsLoading);
   const barsSource = useDesk((s) => s.barsSource);
   const chartFocus = useDesk((s) => s.chartFocus);
@@ -110,24 +116,19 @@ export function CandleChart() {
           </span>
         ) : null}
       </div>
-      <div className="flex h-7 shrink-0 items-center border-b border-border px-3">
-        <div role="group" aria-label="Chart mode" className="flex items-center">
-          {MODES.map((m, i) => (
-            <button
-              key={m.id}
-              type="button"
-              onClick={() => setChartMode(m.id)}
-              aria-pressed={chartMode === m.id}
-              className={cn(
-                "h-6 px-1.5 font-mono text-micro tracking-wide",
-                i > 0 && "border-l border-border",
-                chartMode === m.id ? "text-accent" : "text-subtle hover:text-fg",
-              )}
-            >
-              {m.label}
-            </button>
-          ))}
-        </div>
+      <div className="flex h-7 shrink-0 items-center gap-3 border-b border-border px-3">
+        <QuietPair
+          ariaLabel="Chart mode"
+          value={chartMode}
+          options={MODES}
+          onChange={setChartMode}
+        />
+        <QuietPair
+          ariaLabel="Live data"
+          value={liveData}
+          options={LIVE}
+          onChange={setLiveData}
+        />
       </div>
       <div className="relative min-h-0 flex-1">
         {loading && bars.length === 0 ? (
@@ -139,6 +140,38 @@ export function CandleChart() {
         )}
       </div>
     </Panel>
+  );
+}
+
+function QuietPair<T extends string | boolean>({
+  ariaLabel,
+  value,
+  options,
+  onChange,
+}: {
+  ariaLabel: string;
+  value: T;
+  options: { id: T; label: string }[];
+  onChange: (id: T) => void;
+}) {
+  return (
+    <div role="group" aria-label={ariaLabel} className="flex items-center">
+      {options.map((m, i) => (
+        <button
+          key={String(m.id)}
+          type="button"
+          onClick={() => onChange(m.id)}
+          aria-pressed={value === m.id}
+          className={cn(
+            "h-6 px-1.5 font-mono text-micro tracking-wide",
+            i > 0 && "border-l border-border",
+            value === m.id ? "text-accent" : "text-subtle hover:text-fg",
+          )}
+        >
+          {m.label}
+        </button>
+      ))}
+    </div>
   );
 }
 

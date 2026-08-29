@@ -10,6 +10,7 @@ import {
   seedBars,
   type SimBook,
 } from "@/lib/sim";
+import { DEFAULT_LIVE_DATA, persistDeskClient } from "@/lib/desk-persist";
 import { defaultStrategies } from "@/lib/strategies";
 import type {
   Account,
@@ -59,6 +60,7 @@ export interface DeskState {
   barsSymbol: string;
   barRange: BarRange;
   chartMode: ChartMode;
+  liveData: boolean;
   barsSource: BarSource;
   barsLoading: boolean;
   sim: SimBook;
@@ -81,6 +83,7 @@ export interface DeskState {
   setSelected: (s: string) => void;
   setBarRange: (r: BarRange) => void;
   setChartMode: (m: ChartMode) => void;
+  setLiveData: (on: boolean) => void;
   setQuotes: (q: Record<string, Quote>, source?: TapeSource) => void;
   setBars: (symbol: string, bars: Bar[], source?: BarSource) => void;
   setBarsLoading: (v: boolean) => void;
@@ -141,6 +144,7 @@ export const useDesk = create<DeskState>()(
       barsSymbol: "AAPL",
       barRange: "1M",
       chartMode: "candles",
+      liveData: DEFAULT_LIVE_DATA,
       barsSource: "seed",
       barsLoading: false,
       sim: createStarterBook(),
@@ -163,6 +167,7 @@ export const useDesk = create<DeskState>()(
       setSelected: (s) => set({ selected: s.toUpperCase() }),
       setBarRange: (r) => set({ barRange: r }),
       setChartMode: (m) => set({ chartMode: m }),
+      setLiveData: (on) => set({ liveData: on }),
       setQuotes: (q, source) =>
         set({ quotes: { ...get().quotes, ...q }, ...(source ? { tapeSource: source } : {}) }),
       setBars: (symbol, bars, source) =>
@@ -224,20 +229,7 @@ export const useDesk = create<DeskState>()(
     }),
     {
       name: "nightdesk.v1",
-      partialize: (s) => ({
-        venue: s.venue === "alpaca-live" ? "alpaca-paper" : s.venue,
-        creds: s.creds,
-        watchlist: s.watchlist,
-        selected: s.selected,
-        barRange: s.barRange,
-        chartMode: s.chartMode,
-        sim: s.sim,
-        strategies: s.strategies,
-        botLog: s.botLog.slice(-80),
-        botLogClearedAt: s.botLogClearedAt,
-        risk: s.risk,
-        halted: s.halted,
-      }),
+      partialize: persistDeskClient,
     },
   ),
 );
