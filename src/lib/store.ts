@@ -59,6 +59,7 @@ export interface DeskState {
   barsSymbol: string;
   barRange: BarRange;
   chartMode: ChartMode;
+  liveFeed: boolean;
   barsSource: BarSource;
   barsLoading: boolean;
   sim: SimBook;
@@ -81,6 +82,7 @@ export interface DeskState {
   setSelected: (s: string) => void;
   setBarRange: (r: BarRange) => void;
   setChartMode: (m: ChartMode) => void;
+  setLiveFeed: (v: boolean) => void;
   setQuotes: (q: Record<string, Quote>, source?: TapeSource) => void;
   setBars: (symbol: string, bars: Bar[], source?: BarSource) => void;
   setBarsLoading: (v: boolean) => void;
@@ -141,6 +143,7 @@ export const useDesk = create<DeskState>()(
       barsSymbol: "AAPL",
       barRange: "1M",
       chartMode: "candles",
+      liveFeed: false,
       barsSource: "seed",
       barsLoading: false,
       sim: createStarterBook(),
@@ -163,6 +166,7 @@ export const useDesk = create<DeskState>()(
       setSelected: (s) => set({ selected: s.toUpperCase() }),
       setBarRange: (r) => set({ barRange: r }),
       setChartMode: (m) => set({ chartMode: m }),
+      setLiveFeed: (v) => set({ liveFeed: v }),
       setQuotes: (q, source) =>
         set({ quotes: { ...get().quotes, ...q }, ...(source ? { tapeSource: source } : {}) }),
       setBars: (symbol, bars, source) =>
@@ -231,6 +235,7 @@ export const useDesk = create<DeskState>()(
         selected: s.selected,
         barRange: s.barRange,
         chartMode: s.chartMode,
+        liveFeed: s.liveFeed,
         sim: s.sim,
         strategies: s.strategies,
         botLog: s.botLog.slice(-80),
