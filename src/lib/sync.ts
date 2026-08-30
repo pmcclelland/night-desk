@@ -16,7 +16,10 @@ import { pingAlpaca } from "@/lib/server/trade";
 import { refreshAlpacaBook, runDeskOp } from "@/lib/server/desk-api";
 import { applyPulledDesk, queuePersist, selectSymbol } from "@/lib/desk-sync";
 import { selectAccount, selectPositions, useDesk } from "@/lib/store";
+import { tapePollAllowed } from "@/lib/tape-gate";
 import type { Account, Order, OrderRequest, Position, Venue } from "@/lib/types";
+
+export type TapeCall = { force?: boolean };
 
 function unique(xs: string[]) {
   return [...new Set(xs.filter(Boolean))];
@@ -37,7 +40,8 @@ let barsFlight: Promise<void> | null = null;
 let barsFlightKey = "";
 let barsFlightGen = 0;
 
-export async function refreshQuotes() {
+export async function refreshQuotes(opts?: TapeCall) {
+  if (!tapePollAllowed(useDesk.getState().liveFeed, opts?.force)) return;
   return singleFlight(quotesFlight, async () => {
     const s = useDesk.getState();
     const symbols = unique([
@@ -124,9 +128,10 @@ function applyAlpacaExtra(extra?: {
   return true;
 }
 
-export async function refreshAlpaca() {
+export async function refreshAlpaca(opts?: TapeCall) {
   const s = useDesk.getState();
   if (s.venue === "sim") return;
+  if (!tapePollAllowed(s.liveFeed, opts?.force)) return;
   return singleFlight(alpacaFlight, async () => {
     try {
       const snap = await refreshAlpacaBook();
@@ -202,7 +207,7 @@ export async function placeOrder(req: OrderRequest): Promise<{ ok: boolean; erro
     return { ok: false, error: msg };
   }
   if (result.desk) applyPulledDesk(result.desk);
-  if (!applyAlpacaExtra(result.extra)) await refreshAlpaca();
+  if (!applyAlpacaExtra(result.extra)) await refreshAlpaca({ force: true });
   if (result.extra?.order?.status === "filled" && result.message) toast.success(result.message);
   return { ok: true };
 }
@@ -219,7 +224,7 @@ export async function cancelOrder(id: string) {
   const result = await runDeskOp({ data: { op: "cancel", id } });
   if (!result.ok) useDesk.getState().log("err", result.error ?? "Cancel failed");
   if (result.desk) applyPulledDesk(result.desk);
-  if (!applyAlpacaExtra(result.extra)) await refreshAlpaca();
+  if (!applyAlpacaExtra(result.extra)) await refreshAlpaca({ force: true });
 }
 
 export async function killSwitch(flattenBook: boolean) {
@@ -233,7 +238,7 @@ export async function killSwitch(flattenBook: boolean) {
   } else if (s.creds) {
     const result = await runDeskOp({ data: { op: "halt", flatten: flattenBook } });
     if (result.desk) applyPulledDesk(result.desk);
-    if (!applyAlpacaExtra(result.extra)) await refreshAlpaca();
+    if (!applyAlpacaExtra(result.extra)) await refreshAlpaca({ force: true });
     toast.error("Kill switch engaged");
     return;
   }
@@ -268,7 +273,7 @@ export async function flatten(symbol?: string) {
   const result = await runDeskOp({ data: { op: "flatten", symbol } });
   if (!result.ok) useDesk.getState().log("err", result.error ?? "Flatten failed");
   if (result.desk) applyPulledDesk(result.desk);
-  if (!applyAlpacaExtra(result.extra)) await refreshAlpaca();
+  if (!applyAlpacaExtra(result.extra)) await refreshAlpaca({ force: true });
 }
 
 export async function connectAlpaca(venue: Venue, keyId: string, secret: string) {
@@ -298,8 +303,8 @@ export async function connectAlpaca(venue: Venue, keyId: string, secret: string)
     "sys",
     `Connected ${venue === "alpaca-live" ? "LIVE" : "PAPER"} · equity ${ping.account.equity.toFixed(0)} · tape Alpaca IEX (Yahoo fallback)`,
   );
-  await refreshAlpaca();
-  await refreshQuotes();
+  await refreshAlpaca({ force: true });
+  await refreshQuotes({ force: true });
   void runDeskOp({
     data: { op: "set_venue", venue, keyId: creds.keyId, secret: creds.secret },
   }).catch(() => undefined);
@@ -309,6 +314,7 @@ export async function connectAlpaca(venue: Venue, keyId: string, secret: string)
 
 export async function tickStrategies() {
   const s = useDesk.getState();
+  if (!tapePollAllowed(s.liveFeed)) return;
   if (s.halted) return;
   const armed = s.strategies.filter((st) => st.armed);
   if (armed.length === 0) return;
@@ -428,7 +434,7 @@ export async function runConsole(raw: string) {
     const result = await runDeskOp({ data: { op: "resume" } });
     if (!result.ok) useDesk.getState().log("err", result.error ?? "Resume failed");
     if (result.desk) applyPulledDesk(result.desk);
-    if (!applyAlpacaExtra(result.extra)) await refreshAlpaca();
+    if (!applyAlpacaExtra(result.extra)) await refreshAlpaca({ force: true });
     return;
   }
   if (cmd.op === "flatten") {
@@ -445,7 +451,7 @@ export async function runConsole(raw: string) {
     const result = await runDeskOp({ data: { op: "cancel" } });
     if (!result.ok) useDesk.getState().log("err", result.error ?? "Cancel failed");
     if (result.desk) applyPulledDesk(result.desk);
-    if (!applyAlpacaExtra(result.extra)) await refreshAlpaca();
+    if (!applyAlpacaExtra(result.extra)) await refreshAlpaca({ force: true });
     return;
   }
   if (cmd.op === "thesis") {
@@ -457,7 +463,7 @@ export async function runConsole(raw: string) {
     if (cmd.action === "add") s.addWatch(cmd.symbol);
     else s.rmWatch(cmd.symbol);
     s.log("sys", `Watchlist ${cmd.action} ${cmd.symbol}`);
-    await refreshQuotes();
+    await refreshQuotes({ force: true });
     queuePersist();
     return;
   }

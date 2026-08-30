@@ -1,9 +1,10 @@
 import { mergeBotTapes } from "@/lib/bot-log";
 import { persistDesk, pullDesk } from "@/lib/server/desk-api";
 import { useDesk } from "@/lib/store";
+import { tapePollAllowed } from "@/lib/tape-gate";
 
 let persistTimer: number | null = null;
-let hydrating = false;
+let hydrateFlight: Promise<void> | null = null;
 let lastServerSelected: string | undefined;
 let persistGeneration = 0;
 
@@ -41,22 +42,25 @@ export function selectSymbol(symbol: string) {
   queuePersist();
 }
 
-export async function hydrateDesk() {
-  if (hydrating) return;
-  hydrating = true;
-  try {
-    const desk = await pullDesk();
-    const local = useDesk.getState();
-    const tape = mergeBotTapes(
-      { lines: local.botLog, clearedAt: local.botLogClearedAt ?? 0 },
-      { lines: desk.botLog, clearedAt: desk.botLogClearedAt },
-    );
-    applyPulledDesk({ ...desk, botLog: tape.lines, botLogClearedAt: tape.clearedAt });
-  } catch {
-    /* signed out or not owner */
-  } finally {
-    hydrating = false;
-  }
+export async function hydrateDesk(opts?: { force?: boolean }) {
+  if (!tapePollAllowed(useDesk.getState().liveFeed, opts?.force)) return;
+  if (hydrateFlight) return hydrateFlight;
+  hydrateFlight = (async () => {
+    try {
+      const desk = await pullDesk();
+      const local = useDesk.getState();
+      const tape = mergeBotTapes(
+        { lines: local.botLog, clearedAt: local.botLogClearedAt ?? 0 },
+        { lines: desk.botLog, clearedAt: desk.botLogClearedAt },
+      );
+      applyPulledDesk({ ...desk, botLog: tape.lines, botLogClearedAt: tape.clearedAt });
+    } catch {
+      /* signed out or not owner */
+    }
+  })().finally(() => {
+    hydrateFlight = null;
+  });
+  return hydrateFlight;
 }
 
 export async function persistNow() {

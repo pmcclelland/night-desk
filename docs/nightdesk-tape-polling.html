@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NightDesk — Tape polling</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #050608;
+      --surface: #0b0d11;
+      --elevated: #12151c;
+      --fg: #dcd8cc;
+      --muted: #7c7a70;
+      --subtle: #4e4d47;
+      --accent: #e39400;
+      --up: #2ecf8a;
+      --down: #ef4d4d;
+      --border: #1e232c;
+      --quotes: #e39400;
+      --alpaca: #5b8cff;
+      --algos: #c084fc;
+      --hydrate: #2ecf8a;
+      --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+      --sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--sans);
+      line-height: 1.5;
+    }
+    body { padding: 0 0 96px; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+    header.mast {
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+      padding: 18px 0 16px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .mast-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .brand {
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      color: var(--accent);
+    }
+    .mast-meta {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    h1 {
+      font-family: var(--mono);
+      font-size: clamp(28px, 4vw, 42px);
+      font-weight: 500;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      margin: 36px 0 12px;
+    }
+    .lede {
+      font-size: 18px;
+      color: var(--muted);
+      max-width: 46rem;
+      margin: 0 0 36px;
+    }
+    h2 {
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin: 48px 0 14px;
+      border-top: 1px solid var(--border);
+      padding-top: 28px;
+    }
+    h3 {
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--fg);
+      margin: 22px 0 8px;
+    }
+    p { margin: 0 0 12px; }
+    p.note { color: var(--muted); font-size: 15px; }
+    ul, ol { margin: 0 0 16px; padding: 0 0 0 18px; }
+    li { margin: 0 0 6px; }
+    code {
+      font-family: var(--mono);
+      font-size: 0.92em;
+      color: var(--accent);
+      background: var(--elevated);
+      padding: 1px 5px;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 800px) {
+      .grid-2 { grid-template-columns: 1fr; }
+      .cadence { overflow-x: auto; }
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 16px 16px 14px;
+    }
+    .card h3 { margin-top: 0; }
+    .kicker {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--subtle);
+      margin-bottom: 6px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+    th {
+      text-align: left;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--subtle);
+      font-size: 10px;
+      border-bottom: 1px solid var(--border);
+      padding: 8px 10px;
+    }
+    td {
+      border-bottom: 1px solid var(--border);
+      padding: 9px 10px;
+      vertical-align: top;
+    }
+    .dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+    .sim {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 16px;
+    }
+    .sim-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .pair {
+      display: flex;
+      align-items: center;
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: 0.08em;
+    }
+    .pair button {
+      background: transparent;
+      border: 0;
+      color: var(--subtle);
+      font: inherit;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding: 4px 8px;
+      cursor: pointer;
+    }
+    .pair button + button { border-left: 1px solid var(--border); }
+    .pair button.on { color: var(--accent); }
+    .chk {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+    .lanes { display: grid; gap: 8px; }
+    .lane {
+      display: grid;
+      grid-template-columns: 92px 1fr 52px;
+      gap: 10px;
+      align-items: center;
+    }
+    .lane .name {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+    .track {
+      position: relative;
+      height: 10px;
+      background: var(--elevated);
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+    .track .fill {
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 0;
+      opacity: 0.85;
+    }
+    .count {
+      font-family: var(--mono);
+      font-size: 12px;
+      text-align: right;
+      color: var(--muted);
+    }
+    .log {
+      margin-top: 14px;
+      height: 168px;
+      overflow: auto;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      padding: 8px 10px;
+      font-family: var(--mono);
+      font-size: 11px;
+      line-height: 1.55;
+      color: var(--muted);
+    }
+    .log .poll { color: var(--accent); }
+    .log .force { color: var(--up); }
+    .log .skip { color: var(--subtle); }
+    .layers { display: flex; flex-direction: column; gap: 6px; }
+    .layer {
+      display: grid;
+      grid-template-columns: 160px 1fr;
+      gap: 16px;
+      align-items: start;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 12px 14px;
+    }
+    .layer .name {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+    .layer p { margin: 0; font-size: 14px; color: var(--muted); }
+    .call {
+      display: grid;
+      grid-template-columns: 118px 1fr 90px;
+      gap: 12px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      padding: 10px 12px;
+      margin-bottom: 6px;
+      font-size: 14px;
+    }
+    .call .fn {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      color: var(--accent);
+    }
+    .call .gate { font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; }
+    .gate.snap { color: var(--subtle); }
+    .gate.live { color: var(--accent); }
+    .gate.force { color: var(--up); }
+    .gate.user { color: var(--fg); }
+    .gate.mcp { color: var(--down); }
+    svg.fan { width: 100%; height: auto; display: block; }
+    .bug {
+      border: 1px solid color-mix(in oklab, var(--down) 45%, var(--border));
+      background: var(--surface);
+      padding: 16px;
+    }
+  </style>
+</head>
+<body>
+  <header class="mast">
+    <div class="wrap mast-row">
+      <span class="brand">NIGHTDESK</span>
+      <span class="mast-meta">Tape polling · SNAP | LIVE · REST, no sockets</span>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <h1>The tape is four timers, not a stream.</h1>
+    <p class="lede">
+      NightDesk never opens a websocket or SSE. LIVE is a client-side poll loop.
+      SNAP is that loop torn down, plus a gate on the fetchers so leftover timers
+      cannot keep spending. One snapshot still fires on load.
+    </p>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="kicker">SNAP · default</div>
+        <h3>One burst, then quiet</h3>
+        <p class="note">
+          Persist <code>liveFeed: false</code> in <code>nightdesk.v1</code>.
+          Boot hydrates the desk, pulls quotes, draws bars, and (if the venue is
+          Alpaca) snapshots the book. Then <code>stopLiveLoop()</code> runs.
+          Recurring spend stops.
+        </p>
+      </div>
+      <div class="card">
+        <div class="kicker">LIVE · opt-in</div>
+        <h3>Polls while this tab is open</h3>
+        <p class="note">
+          Setting LIVE immediately refreshes quotes and the Alpaca book, then
+          starts four <code>setInterval</code>s plus a visibility listener.
+          Background tabs pause. There is no server cron.
+        </p>
+      </div>
+    </div>
+
+    <h2>Cadence</h2>
+    <p class="note">All periods live in <code>LIVE_POLL_MS</code>. Alpaca book ticks no-op on SIM.</p>
+    <div class="cadence">
+      <table>
+        <thead>
+          <tr>
+            <th>Lane</th>
+            <th>Period</th>
+            <th>Client call</th>
+            <th>Server work</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="dot" style="background:var(--quotes)"></span>Quotes</td>
+            <td>8s</td>
+            <td><code>refreshQuotes()</code></td>
+            <td>Alpaca IEX snapshots, else Yahoo spark in chunks of 10, else seed. Watchlist + positions + strategy symbols, one POST.</td>
+          </tr>
+          <tr>
+            <td><span class="dot" style="background:var(--alpaca)"></span>Book</td>
+            <td>15s</td>
+            <td><code>refreshAlpaca()</code></td>
+            <td>Account + positions + orders. Skipped when venue is SIM.</td>
+          </tr>
+          <tr>
+            <td><span class="dot" style="background:var(--algos)"></span>Algos</td>
+            <td>20s</td>
+            <td><code>tickStrategies()</code></td>
+            <td>6M bars per <em>armed</em> strategy. May place or flatten. 15-minute fire cooldown. No-op if none armed or desk halted.</td>
+          </tr>
+          <tr>
+            <td><span class="dot" style="background:var(--hydrate)"></span>Hydrate</td>
+            <td>30s</td>
+            <td><code>hydrateDesk()</code></td>
+            <td><code>pullDesk</code> GET. Reconciles Neon desk onto the client. Not a market-data poll, still a server round-trip.</td>
+          </tr>
+          <tr>
+            <td>Visibility</td>
+            <td>on show</td>
+            <td>quotes + book</td>
+            <td>Same as the quote and book lanes, once, when the tab becomes visible.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2>Run the loop</h2>
+    <p class="note">
+      Time is 20× desk time. SNAP stops the lanes. Hidden tab holds the fills.
+      Boot still logs one forced snapshot.
+    </p>
+    <div class="sim">
+      <div class="sim-bar">
+        <div class="pair" role="group" aria-label="Quote feed">
+          <button type="button" id="btn-snap">SNAP</button>
+          <button type="button" id="btn-live">LIVE</button>
+        </div>
+        <label class="chk"><input type="checkbox" id="hidden" /> Tab hidden</label>
+        <span class="mast-meta" id="clock">T+0.0s</span>
+      </div>
+      <div class="lanes" id="lanes"></div>
+      <div class="log" id="log" aria-live="polite"></div>
+    </div>
+
+    <h2>Boot, then maybe the loop</h2>
+    <p>
+      <code>TerminalShell</code> mounts two independent effects. The empty-deps
+      effect is the SNAP snapshot. The <code>liveFeed</code> effect is the loop.
+    </p>
+    <ol>
+      <li><code>hydrateDesk({ force: true })</code> — pull Neon desk. Shared in-flight promise so Strict Mode cannot double-pull.</li>
+      <li>Then <code>refreshQuotes({ force: true })</code> and <code>refreshBars()</code>.</li>
+      <li>If venue is not SIM, <code>refreshAlpaca({ force: true })</code>.</li>
+      <li>If <code>liveFeed</code> is false, <code>stopLiveLoop()</code> and return. No intervals.</li>
+      <li>If true, kick quotes + book once more, then <code>startLiveLoop</code>.</li>
+    </ol>
+    <p class="note">
+      Chart bars are not on the live cadence. Changing symbol or range calls
+      <code>refreshBars()</code> in both SNAP and LIVE. That is a user action.
+    </p>
+
+    <h2>Three gates</h2>
+    <p class="note">SNAP used to be only gate 1, and only the skip-start half of it. Leftover timers walked through the fetchers unchallenged.</p>
+    <div class="layers">
+      <div class="layer">
+        <div class="name">1 · Effect</div>
+        <p>
+          <code>if (!liveFeed) { stopLiveLoop(); return; }</code>
+          SNAP must tear the loop down, not merely decline to start a new one.
+          <code>startLiveLoop</code> also stops any previous loop first — one set of timers, stored on <code>globalThis</code> so HMR cannot stack copies.
+        </p>
+      </div>
+      <div class="layer">
+        <div class="name">2 · Tick</div>
+        <p>
+          Each interval and the visibility listener call <code>isLive()</code>
+          (reads <code>useDesk.getState().liveFeed</code>) and skip when the tab is <code>document.hidden</code>.
+        </p>
+      </div>
+      <div class="layer">
+        <div class="name">3 · Fetcher</div>
+        <p>
+          <code>tapePollAllowed(liveFeed, force)</code> is <code>force || liveFeed === true</code>.
+          Polls pass no force. Boot and user actions pass <code>{ force: true }</code>.
+          A leaked timer that still calls <code>refreshQuotes()</code> dies here on SNAP.
+        </p>
+      </div>
+    </div>
+
+    <h2>Who is allowed to fetch</h2>
+    <div class="call"><span class="fn">refreshQuotes</span><span>Boot, LIVE poll, add-to-watch, connect venue</span><span class="gate force">force or LIVE</span></div>
+    <div class="call"><span class="fn">refreshAlpaca</span><span>Boot (non-SIM), LIVE poll, orders / flatten / halt</span><span class="gate force">force or LIVE</span></div>
+    <div class="call"><span class="fn">tickStrategies</span><span>LIVE poll only. Never forced.</span><span class="gate live">LIVE only</span></div>
+    <div class="call"><span class="fn">hydrateDesk</span><span>Boot forced. LIVE poll unforced.</span><span class="gate force">force or LIVE</span></div>
+    <div class="call"><span class="fn">refreshBars</span><span>Boot + symbol/range change. Chart, not tape.</span><span class="gate user">ungated</span></div>
+    <div class="call"><span class="fn">MCP tools</span><span>Inbound bot <code>get_quotes</code> / <code>desk_status</code> still hit Yahoo or Alpaca. SNAP does not see them.</span><span class="gate mcp">not gated</span></div>
+
+    <h2>One client POST, many vendor GETs</h2>
+    <p class="note">
+      The browser talks only to NightDesk server functions. Spend you see in
+      Alpaca or Yahoo dashboards is the handler fanning out.
+    </p>
+    <svg class="fan" viewBox="0 0 980 220" role="img" aria-label="Client to server to vendor">
+      <rect x="20" y="70" width="170" height="80" fill="#0b0d11" stroke="#1e232c" />
+      <text x="105" y="104" text-anchor="middle" fill="#e39400" font-family="IBM Plex Mono, monospace" font-size="11">BROWSER</text>
+      <text x="105" y="122" text-anchor="middle" fill="#7c7a70" font-family="IBM Plex Mono, monospace" font-size="10">1 POST fetchQuotes</text>
+      <line x1="190" y1="110" x2="270" y2="110" stroke="#e39400" />
+      <rect x="270" y="70" width="200" height="80" fill="#0b0d11" stroke="#1e232c" />
+      <text x="370" y="104" text-anchor="middle" fill="#e39400" font-family="IBM Plex Mono, monospace" font-size="11">SERVER FN</text>
+      <text x="370" y="122" text-anchor="middle" fill="#7c7a70" font-family="IBM Plex Mono, monospace" font-size="10">loadDesk + loadQuotes</text>
+      <line x1="470" y1="90" x2="560" y2="40" stroke="#5b8cff" />
+      <line x1="470" y1="110" x2="560" y2="110" stroke="#e39400" />
+      <line x1="470" y1="130" x2="560" y2="180" stroke="#7c7a70" />
+      <rect x="560" y="16" width="200" height="50" fill="#0b0d11" stroke="#1e232c" />
+      <text x="660" y="46" text-anchor="middle" fill="#dcd8cc" font-family="IBM Plex Mono, monospace" font-size="11">Alpaca IEX snapshots</text>
+      <rect x="560" y="86" width="200" height="50" fill="#0b0d11" stroke="#1e232c" />
+      <text x="660" y="116" text-anchor="middle" fill="#dcd8cc" font-family="IBM Plex Mono, monospace" font-size="11">Yahoo spark / 10</text>
+      <rect x="560" y="156" width="200" height="50" fill="#0b0d11" stroke="#1e232c" />
+      <text x="660" y="186" text-anchor="middle" fill="#dcd8cc" font-family="IBM Plex Mono, monospace" font-size="11">SEED jitter</text>
+    </svg>
+    <p class="note">
+      SIM uses Yahoo (delayed) then seed. Alpaca paper/live uses IEX; missing
+      names fill from Yahoo. Quote single-flight prevents overlapping POSTs.
+      Strategy ticks are also single-flight, but each armed name is its own bars request inside that flight.
+    </p>
+
+    <h2>The SNAP leak</h2>
+    <div class="bug">
+      <div class="kicker">Fixed</div>
+      <h3>Skipping start is not stop</h3>
+      <p>
+        The first SNAP implementation gated the effect with
+        <code>if (!liveFeed) return</code>. That does not run cleanup. A loop
+        started by LIVE, by a stacked mount, or by HMR kept its intervals.
+        Those callbacks called <code>refreshQuotes</code> with no SNAP check.
+      </p>
+      <p class="note" style="margin:0">
+        SNAP now calls <code>stopLiveLoop()</code>, the loop is a singleton,
+        ticks read <code>isLive()</code>, and fetchers refuse unforced SNAP
+        polls. Boot and user actions still pass <code>force: true</code>.
+      </p>
+    </div>
+
+    <h2>Where it lives</h2>
+    <table>
+      <thead>
+        <tr><th>File</th><th>Role</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>src/lib/live-loop.ts</code></td><td>Cadence, singleton stop, hidden-tab skip, <code>isLive</code> tick gate.</td></tr>
+        <tr><td><code>src/lib/tape-gate.ts</code></td><td><code>tapePollAllowed(liveFeed, force)</code>.</td></tr>
+        <tr><td><code>src/components/terminal/shell.tsx</code></td><td>Boot snapshot, SNAP teardown, LIVE start.</td></tr>
+        <tr><td><code>src/lib/sync.ts</code></td><td>Quotes, book, strategy ticks. Force on user/boot.</td></tr>
+        <tr><td><code>src/lib/desk-sync.ts</code></td><td>Hydrate + persist. Hydrate gated unless forced.</td></tr>
+        <tr><td><code>src/lib/store.ts</code></td><td><code>liveFeed</code>, default false, persisted in <code>nightdesk.v1</code>.</td></tr>
+        <tr><td><code>src/components/terminal/settings-dialog.tsx</code></td><td>SNAP | LIVE under Desk settings → Market data → Updates.</td></tr>
+        <tr><td><code>src/lib/server/market.ts</code></td><td>Alpaca / Yahoo / seed quote and bar handlers.</td></tr>
+      </tbody>
+    </table>
+  </main>
+
+  <script>
+    const CADENCE = { quotes: 8000, alpaca: 15000, strategies: 20000, hydrate: 30000 };
+    const COLORS = { quotes: "#e39400", alpaca: "#5b8cff", strategies: "#c084fc", hydrate: "#2ecf8a" };
+    const SCALE = 20;
+    const state = { live: false, hidden: false, t0: performance.now(), counts: {}, last: {} };
+    const lanesEl = document.getElementById("lanes");
+    const logEl = document.getElementById("log");
+    const clockEl = document.getElementById("clock");
+    const btnSnap = document.getElementById("btn-snap");
+    const btnLive = document.getElementById("btn-live");
+    const hiddenEl = document.getElementById("hidden");
+
+    function tapeAllowed(force) {
+      return force || state.live === true;
+    }
+
+    function log(kind, msg) {
+      const desk = ((performance.now() - state.t0) * SCALE / 1000);
+      const row = document.createElement("div");
+      row.className = kind;
+      row.textContent = desk.toFixed(1).padStart(6, " ") + "s  " + msg;
+      logEl.prepend(row);
+      while (logEl.childNodes.length > 40) logEl.removeChild(logEl.lastChild);
+    }
+
+    function fire(lane, force) {
+      if (state.hidden && !force) {
+        log("skip", lane.toUpperCase() + " skipped · tab hidden");
+        return;
+      }
+      if (!tapeAllowed(force)) {
+        log("skip", lane.toUpperCase() + " skipped · SNAP");
+        return;
+      }
+      state.counts[lane] = (state.counts[lane] || 0) + 1;
+      state.last[lane] = performance.now();
+      document.querySelector('[data-count="' + lane + '"]').textContent = String(state.counts[lane]);
+      log(force ? "force" : "poll", lane.toUpperCase() + (force ? " forced snapshot" : " poll"));
+    }
+
+    function setLive(on) {
+      state.live = on;
+      btnSnap.classList.toggle("on", !on);
+      btnLive.classList.toggle("on", on);
+      if (on) {
+        fire("quotes", false);
+        fire("alpaca", false);
+        log("poll", "LIVE loop armed");
+      } else {
+        log("skip", "SNAP · stopLiveLoop()");
+      }
+    }
+
+    Object.keys(CADENCE).forEach((lane) => {
+      state.counts[lane] = 0;
+      state.last[lane] = performance.now();
+      const row = document.createElement("div");
+      row.className = "lane";
+      row.innerHTML =
+        '<div class="name" style="color:' + COLORS[lane] + '">' + lane + "</div>" +
+        '<div class="track"><div class="fill" data-fill="' + lane + '" style="background:' + COLORS[lane] + '"></div></div>' +
+        '<div class="count" data-count="' + lane + '">0</div>';
+      lanesEl.appendChild(row);
+    });
+
+    btnSnap.addEventListener("click", () => setLive(false));
+    btnLive.addEventListener("click", () => setLive(true));
+    hiddenEl.addEventListener("change", () => {
+      state.hidden = hiddenEl.checked;
+      if (!state.hidden && state.live) {
+        fire("quotes", false);
+        fire("alpaca", false);
+        log("poll", "visibility refresh");
+      }
+    });
+
+    log("force", "BOOT hydrate + quotes + bars");
+    fire("quotes", true);
+    fire("alpaca", true);
+    setLive(false);
+
+    function tick(now) {
+      const desk = (now - state.t0) * SCALE / 1000;
+      clockEl.textContent = "T+" + desk.toFixed(1) + "s";
+      Object.entries(CADENCE).forEach(([lane, ms]) => {
+        const elapsed = (now - state.last[lane]) * SCALE;
+        const pct = Math.min(100, (elapsed / ms) * 100);
+        document.querySelector('[data-fill="' + lane + '"]').style.width = pct + "%";
+        if (state.live && !state.hidden && elapsed >= ms) fire(lane, false);
+      });
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  </script>
+</body>
+</html>

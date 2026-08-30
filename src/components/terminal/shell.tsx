@@ -12,7 +12,7 @@ import { StrategyLab } from "@/components/terminal/strategy-lab";
 import { SettingsDialog } from "@/components/terminal/settings-dialog";
 import { useIsDesktop } from "@/lib/hooks";
 import { useDesk, type MobileTab } from "@/lib/store";
-import { startLiveLoop } from "@/lib/live-loop";
+import { startLiveLoop, stopLiveLoop } from "@/lib/live-loop";
 import { refreshAlpaca, refreshBars, refreshQuotes, tickStrategies } from "@/lib/sync";
 import { hydrateDesk } from "@/lib/desk-sync";
 import {
@@ -51,16 +51,21 @@ export function TerminalShell() {
   const live = useRef(false);
 
   useEffect(() => {
+    let cancelled = false;
     const s = useDesk.getState();
     if (s.botLog.length === 0) {
       s.log("sys", "NIGHTDESK online. Venue SIM. Type HELP. Freeform goes to the Grok Bot.");
     }
-    void hydrateDesk().then(() => {
+    void hydrateDesk({ force: true }).then(() => {
+      if (cancelled) return;
       live.current = true;
-      void refreshQuotes();
+      void refreshQuotes({ force: true });
       void refreshBars();
-      if (useDesk.getState().venue !== "sim") void refreshAlpaca();
+      if (useDesk.getState().venue !== "sim") void refreshAlpaca({ force: true });
     });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -69,18 +74,22 @@ export function TerminalShell() {
   }, [selected, barRange]);
 
   useEffect(() => {
-    if (!liveFeed) return;
+    if (!liveFeed) {
+      // SNAP must stop any leftover loop, not just skip starting one.
+      stopLiveLoop();
+      return;
+    }
     const refreshBook = () => {
       if (useDesk.getState().venue !== "sim") void refreshAlpaca();
     };
     void refreshQuotes();
     refreshBook();
     return startLiveLoop({
-      // SNAP unmounts this effect and the stopper clears every interval + visibility listener.
       refreshQuotes: () => void refreshQuotes(),
       refreshAlpaca: refreshBook,
       tickStrategies: () => void tickStrategies(),
       hydrateDesk: () => void hydrateDesk(),
+      isLive: () => useDesk.getState().liveFeed,
     });
   }, [liveFeed]);
 

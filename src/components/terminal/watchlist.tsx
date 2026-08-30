@@ -23,7 +23,7 @@ export function Watchlist() {
     addWatch(s);
     selectSymbol(s);
     setDraft("");
-    void refreshQuotes();
+    void refreshQuotes({ force: true });
     queuePersist();
   }
 
