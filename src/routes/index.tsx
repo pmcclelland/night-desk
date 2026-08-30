@@ -12,24 +12,26 @@ export const Route = createFileRoute("/")({ component: Home });
 function Home() {
   const { user, isPending } = useCurrentUserState();
   const [access, setAccess] = useState<{ owner: boolean } | null>(null);
+  const userId = user?.id;
 
   useEffect(() => {
-    if (!user) {
+    if (!userId) {
       setAccess(null);
       return;
     }
     let live = true;
     void getDeskAccess()
       .then((a) => {
-        if (live) setAccess(a);
+        if (!live) return;
+        setAccess((prev) => (prev?.owner === a.owner ? prev : { owner: a.owner }));
       })
       .catch(() => {
-        if (live) setAccess({ owner: false });
+        if (live) setAccess((prev) => (prev?.owner === false ? prev : { owner: false }));
       });
     return () => {
       live = false;
     };
-  }, [user]);
+  }, [userId]);
 
   if (isPending) {
     return (
