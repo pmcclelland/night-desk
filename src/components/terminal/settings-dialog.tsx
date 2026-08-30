@@ -22,6 +22,11 @@ const TAPE_LABEL: Record<TapeSource, string> = {
   seed: "Offline seed",
 };
 
+const FEED_MODES = [
+  { on: false, label: "SNAP" },
+  { on: true, label: "LIVE" },
+] as const;
+
 export function SettingsDialog() {
   const open = useDesk((s) => s.settingsOpen);
   const setOpen = useDesk((s) => s.setSettingsOpen);
@@ -33,6 +38,8 @@ export function SettingsDialog() {
   const resetSim = useDesk((s) => s.resetSim);
   const tapeSource = useDesk((s) => s.tapeSource);
   const barsSource = useDesk((s) => s.barsSource);
+  const liveFeed = useDesk((s) => s.liveFeed);
+  const setLiveFeed = useDesk((s) => s.setLiveFeed);
 
   const [draftVenue, setDraftVenue] = useState<Venue>(venue);
   const [keyId, setKeyId] = useState(creds?.keyId ?? "");
@@ -110,6 +117,29 @@ export function SettingsDialog() {
               book 15s. Background tabs pause.
             </p>
           )}
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <span className="font-mono text-micro tracking-widest text-subtle uppercase">Updates</span>
+            <div role="group" aria-label="Quote feed" className="flex items-center">
+              {FEED_MODES.map((m, i) => (
+                <button
+                  key={m.label}
+                  type="button"
+                  onClick={() => setLiveFeed(m.on)}
+                  aria-pressed={liveFeed === m.on}
+                  className={cn(
+                    "h-6 px-1.5 font-mono text-micro tracking-wide",
+                    i > 0 && "border-l border-border",
+                    liveFeed === m.on ? "text-accent" : "text-subtle hover:text-fg",
+                  )}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <p className="mt-1 font-mono text-2xs leading-relaxed text-muted">
+            SNAP fetches once on load. LIVE updates while this tab is open.
+          </p>
           <p className="mt-2 font-mono text-micro tracking-widest text-subtle uppercase">
             Live tape {TAPE_LABEL[tapeSource]} · bars {barsSource === "alpaca" ? "IEX" : barsSource === "yahoo" ? "YH" : "SEED"}
           </p>

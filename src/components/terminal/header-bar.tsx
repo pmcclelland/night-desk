@@ -111,12 +111,10 @@ export function HeaderBar() {
           valueClass={signClass(account.dayPl)}
         />
 
-        <FeedModeToggle />
-
         <Button
           variant="halt"
           size="sm"
-          className="ml-1 hidden md:ml-2 md:inline-flex"
+          className="hidden md:inline-flex"
           onClick={() => void killSwitch(false)}
         >
           <Power className="size-3" />
@@ -144,35 +142,6 @@ export function HeaderBar() {
         <OperatorChip />
       </div>
     </header>
-  );
-}
-
-function FeedModeToggle() {
-  const liveFeed = useDesk((s) => s.liveFeed);
-  const setLiveFeed = useDesk((s) => s.setLiveFeed);
-  const modes = [
-    { on: false, label: "SNAP" },
-    { on: true, label: "LIVE" },
-  ] as const;
-
-  return (
-    <div role="group" aria-label="Quote feed" className="flex shrink-0 items-center">
-      {modes.map((m, i) => (
-        <button
-          key={m.label}
-          type="button"
-          onClick={() => setLiveFeed(m.on)}
-          aria-pressed={liveFeed === m.on}
-          className={cn(
-            "h-6 px-1.5 font-mono text-micro tracking-wide",
-            i > 0 && "border-l border-border",
-            liveFeed === m.on ? "text-accent" : "text-subtle hover:text-fg",
-          )}
-        >
-          {m.label}
-        </button>
-      ))}
-    </div>
   );
 }
 
