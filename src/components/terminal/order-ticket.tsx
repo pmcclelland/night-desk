@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { money, px } from "@/lib/format";
-import { useDesk, useLiveBook } from "@/lib/store";
+import { selectVenue, useDesk, useLiveBook } from "@/lib/store";
 import { flatten, placeOrder } from "@/lib/sync";
 import type { OrderSide, OrderType, TimeInForce } from "@/lib/types";
 import { Panel } from "@/components/terminal/panel";
@@ -16,7 +16,7 @@ export function OrderTicket() {
   const quotes = useDesk((s) => s.quotes);
   const risk = useDesk((s) => s.risk);
   const halted = useDesk((s) => s.halted);
-  const venue = useDesk((s) => s.venue);
+  const venue = useDesk(selectVenue);
   const { account, positions } = useLiveBook();
   const pos = positions.find((p) => p.symbol === selected);
   const q = quotes[selected];

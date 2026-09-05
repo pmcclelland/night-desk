@@ -1,8 +1,9 @@
 import { Maximize2, Minimize2, Power, Settings } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { clockDate, clockTime, money, pct, signClass, signedMoney } from "@/lib/format";
 import { getMarketClock } from "@/lib/market-hours";
 import { useNow } from "@/lib/hooks";
-import { useDesk, useLiveBook } from "@/lib/store";
+import { selectVenue, useDesk, useLiveBook } from "@/lib/store";
 import { killSwitch } from "@/lib/sync";
 import { signOut } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
@@ -26,7 +27,8 @@ const TAPE: Record<TapeSource, { label: string; title: string }> = {
 export function HeaderBar() {
   const now = useNow(1000);
   const clock = now ? getMarketClock(now) : null;
-  const venue = useDesk((s) => s.venue);
+  const venue = useDesk(selectVenue);
+  const guestDemo = useDesk((s) => s.guestDemo);
   const halted = useDesk((s) => s.halted);
   const tapeSource = useDesk((s) => s.tapeSource);
   const immersive = useDesk((s) => s.immersive);
@@ -45,8 +47,9 @@ export function HeaderBar() {
         <span className="font-mono text-xs font-medium tracking-widest text-accent">NIGHTDESK</span>
         <span
           className={cn(
-            "hidden font-mono text-micro tracking-widest uppercase md:inline",
+            "font-mono text-micro tracking-widest uppercase",
             venue === "alpaca-live" ? "text-down" : "text-muted",
+            !guestDemo && "hidden md:inline",
           )}
         >
           {VENUE[venue]}
@@ -150,7 +153,16 @@ function OperatorChip() {
   if (isPending) {
     return <span className="hidden h-7 w-16 animate-pulse bg-elevated md:inline-block" />;
   }
-  if (!user) return null;
+  if (!user) {
+    return (
+      <Link
+        to="/login"
+        className="font-mono text-micro tracking-widest text-muted uppercase hover:text-fg"
+      >
+        Sign in
+      </Link>
+    );
+  }
   const label = user.displayName ?? user.primaryEmail ?? "Op";
   return (
     <button

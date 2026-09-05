@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { Group, Panel as RPanel, Separator, useDefaultLayout } from "react-resizable-panels";
 import { Toaster } from "sonner";
 import { HeaderBar } from "@/components/terminal/header-bar";
@@ -11,10 +11,11 @@ import { BotConsole } from "@/components/terminal/bot-console";
 import { StrategyLab } from "@/components/terminal/strategy-lab";
 import { SettingsDialog } from "@/components/terminal/settings-dialog";
 import { useIsDesktop } from "@/lib/hooks";
-import { useDesk, type MobileTab } from "@/lib/store";
+import { selectLiveFeed, selectVenue, useDesk, type MobileTab } from "@/lib/store";
 import { startLiveLoop, stopLiveLoop } from "@/lib/live-loop";
 import { refreshAlpaca, refreshBars, refreshQuotes, tickStrategies } from "@/lib/sync";
 import { hydrateDesk } from "@/lib/desk-sync";
+import { seedBars } from "@/lib/sim";
 import {
   exitNativeFullscreen,
   isNativeFullscreen,
@@ -37,7 +38,7 @@ function isTypingTarget(el: EventTarget | null) {
   return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.isContentEditable;
 }
 
-export function TerminalShell() {
+export function TerminalShell({ guest = false }: { guest?: boolean }) {
   const desktop = useIsDesktop();
   const selected = useDesk((s) => s.selected);
   const barRange = useDesk((s) => s.barRange);
@@ -45,28 +46,43 @@ export function TerminalShell() {
   const setMobileTab = useDesk((s) => s.setMobileTab);
   const immersive = useDesk((s) => s.immersive);
   const chartFocus = useDesk((s) => s.chartFocus);
-  const liveFeed = useDesk((s) => s.liveFeed);
+  const liveFeed = useDesk(selectLiveFeed);
   const rootRef = useRef<HTMLDivElement>(null);
 
   const live = useRef(false);
+
+  useLayoutEffect(() => {
+    useDesk.getState().setGuestDemo(guest);
+  }, [guest]);
 
   useEffect(() => {
     let cancelled = false;
     const s = useDesk.getState();
     if (s.botLog.length === 0) {
-      s.log("sys", "NIGHTDESK online. Venue SIM. Type HELP. Freeform goes to the Grok Bot.");
+      s.log(
+        "sys",
+        guest
+          ? "NIGHTDESK online. Venue SIM (public demo). Type HELP. Sign in for paper/live."
+          : "NIGHTDESK online. Venue SIM. Type HELP. Freeform goes to the Grok Bot.",
+      );
+    }
+    if (guest) {
+      live.current = true;
+      s.setQuotes(s.quotes, "seed");
+      s.setBars(s.selected, seedBars(s.selected), "seed");
+      return;
     }
     void hydrateDesk({ force: true }).then(() => {
       if (cancelled) return;
       live.current = true;
       void refreshQuotes({ force: true });
       void refreshBars();
-      if (useDesk.getState().venue !== "sim") void refreshAlpaca({ force: true });
+      if (selectVenue(useDesk.getState()) !== "sim") void refreshAlpaca({ force: true });
     });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [guest]);
 
   useEffect(() => {
     if (!live.current) return;
@@ -80,7 +96,7 @@ export function TerminalShell() {
       return;
     }
     const refreshBook = () => {
-      if (useDesk.getState().venue !== "sim") void refreshAlpaca();
+      if (selectVenue(useDesk.getState()) !== "sim") void refreshAlpaca();
     };
     void refreshQuotes();
     refreshBook();
@@ -89,7 +105,7 @@ export function TerminalShell() {
       refreshAlpaca: refreshBook,
       tickStrategies: () => void tickStrategies(),
       hydrateDesk: () => void hydrateDesk(),
-      isLive: () => useDesk.getState().liveFeed,
+      isLive: () => selectLiveFeed(useDesk.getState()),
     });
   }, [liveFeed]);
 

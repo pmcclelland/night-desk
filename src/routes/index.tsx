@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { TerminalShell } from "@/components/terminal/shell";
-import { RedirectToSignIn, SignedIn } from "@/lib/auth/gates";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { signOut } from "@/lib/auth/client";
 import { getDeskAccess } from "@/lib/server/desk-api";
+import { useDesk } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/")({ component: Home });
@@ -13,6 +13,19 @@ function Home() {
   const { user, isPending } = useCurrentUserState();
   const [access, setAccess] = useState<{ owner: boolean } | null>(null);
   const userId = user?.id;
+  const guest = !isPending && !user;
+
+  if (!isPending) {
+    const next = !user;
+    if (useDesk.getState().guestDemo !== next) {
+      useDesk.getState().setGuestDemo(next);
+    }
+  }
+
+  useLayoutEffect(() => {
+    if (isPending) return;
+    useDesk.getState().setGuestDemo(!user);
+  }, [isPending, user]);
 
   useEffect(() => {
     if (!userId) {
@@ -40,7 +53,7 @@ function Home() {
       </div>
     );
   }
-  if (!user) return <RedirectToSignIn />;
+  if (guest) return <TerminalShell guest />;
   if (!access) {
     return (
       <div className="grid h-dvh place-items-center bg-bg text-fg">
@@ -65,9 +78,5 @@ function Home() {
     );
   }
 
-  return (
-    <SignedIn>
-      <TerminalShell />
-    </SignedIn>
-  );
+  return <TerminalShell />;
 }

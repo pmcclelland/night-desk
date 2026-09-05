@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { useDesk } from "@/lib/store";
+import { Link } from "@tanstack/react-router";
+import { selectLiveFeed, selectVenue, useDesk } from "@/lib/store";
 import { connectAlpaca } from "@/lib/sync";
 import { queuePersist } from "@/lib/desk-sync";
 import { listDeskTokens, mintDeskToken, revokeDeskToken } from "@/lib/server/desk-api";
@@ -30,7 +31,8 @@ const FEED_MODES = [
 export function SettingsDialog() {
   const open = useDesk((s) => s.settingsOpen);
   const setOpen = useDesk((s) => s.setSettingsOpen);
-  const venue = useDesk((s) => s.venue);
+  const venue = useDesk(selectVenue);
+  const guestDemo = useDesk((s) => s.guestDemo);
   const creds = useDesk((s) => s.creds);
   const risk = useDesk((s) => s.risk);
   const setRisk = useDesk((s) => s.setRisk);
@@ -38,7 +40,7 @@ export function SettingsDialog() {
   const resetSim = useDesk((s) => s.resetSim);
   const tapeSource = useDesk((s) => s.tapeSource);
   const barsSource = useDesk((s) => s.barsSource);
-  const liveFeed = useDesk((s) => s.liveFeed);
+  const liveFeed = useDesk(selectLiveFeed);
   const setLiveFeed = useDesk((s) => s.setLiveFeed);
 
   const [draftVenue, setDraftVenue] = useState<Venue>(venue);
@@ -64,27 +66,48 @@ export function SettingsDialog() {
       <DialogContent className="max-h-[min(92dvh,720px)] w-[min(92vw,480px)] overflow-y-auto">
         <DialogTitle>Desk settings</DialogTitle>
         <DialogDescription>
-          Alpaca keys are encrypted on the operator desk so a Grok Bot can trade through MCP. SIM needs no keys.
+          {guestDemo
+            ? "Public demo is locked to SIM with the seed book. Sign in to connect Alpaca or turn LIVE on."
+            : "Alpaca keys are encrypted on the operator desk so a Grok Bot can trade through MCP. SIM needs no keys."}
         </DialogDescription>
 
+        {guestDemo ? (
+          <p className="mt-3 font-mono text-2xs leading-relaxed text-muted">
+            <Link to="/login" className="text-accent hover:text-fg">
+              Sign in
+            </Link>{" "}
+            to use paper/live and persist the desk.
+          </p>
+        ) : null}
+
         <div className="mt-4 space-y-2">
-          {VENUES.map((v) => (
-            <button
-              key={v.id}
-              type="button"
-              onClick={() => setDraftVenue(v.id)}
-              className={cn(
-                "flex w-full flex-col border px-3 py-2 text-left",
-                draftVenue === v.id ? "border-accent bg-elevated" : "border-border hover:bg-elevated",
-              )}
-            >
-              <span className="font-mono text-xs text-fg">{v.label}</span>
-              <span className="font-mono text-micro text-muted">{v.hint}</span>
-            </button>
-          ))}
+          {VENUES.map((v) => {
+            const locked = guestDemo && v.id !== "sim";
+            return (
+              <button
+                key={v.id}
+                type="button"
+                disabled={locked}
+                onClick={() => {
+                  if (locked) return;
+                  setDraftVenue(v.id);
+                }}
+                className={cn(
+                  "flex w-full flex-col border px-3 py-2 text-left",
+                  (guestDemo ? venue : draftVenue) === v.id
+                    ? "border-accent bg-elevated"
+                    : "border-border hover:bg-elevated",
+                  locked && "cursor-not-allowed opacity-40 hover:bg-transparent",
+                )}
+              >
+                <span className="font-mono text-xs text-fg">{v.label}</span>
+                <span className="font-mono text-micro text-muted">{v.hint}</span>
+              </button>
+            );
+          })}
         </div>
 
-        {draftVenue !== "sim" ? (
+        {!guestDemo && draftVenue !== "sim" ? (
           <div className="mt-4 space-y-2">
             <label className="block font-mono text-micro tracking-widest text-subtle uppercase">
               Key ID
@@ -105,9 +128,11 @@ export function SettingsDialog() {
 
         <div className="mt-4 border border-border bg-elevated px-3 py-2">
           <p className="font-mono text-micro tracking-widest text-subtle uppercase">Market data</p>
-          {draftVenue === "sim" ? (
+          {guestDemo || draftVenue === "sim" ? (
             <p className="mt-1 font-mono text-2xs leading-relaxed text-muted">
-              Quotes and candles from Yahoo Finance (delayed). Book is the local $100k sim. No keys.
+              {guestDemo
+                ? "Seed quotes and candles. Local $100k sim book. No live tape."
+                : "Quotes and candles from Yahoo Finance (delayed). Book is the local $100k sim. No keys."}
             </p>
           ) : (
             <p className="mt-1 font-mono text-2xs leading-relaxed text-muted">
@@ -124,12 +149,17 @@ export function SettingsDialog() {
                 <button
                   key={m.label}
                   type="button"
-                  onClick={() => setLiveFeed(m.on)}
+                  onClick={() => {
+                    if (guestDemo) return;
+                    setLiveFeed(m.on);
+                  }}
+                  disabled={guestDemo && m.on}
                   aria-pressed={liveFeed === m.on}
                   className={cn(
                     "h-6 px-1.5 font-mono text-micro tracking-wide",
                     i > 0 && "border-l border-border",
                     liveFeed === m.on ? "text-accent" : "text-subtle hover:text-fg",
+                    guestDemo && m.on && "cursor-not-allowed opacity-40 hover:text-subtle",
                   )}
                 >
                   {m.label}
@@ -138,7 +168,9 @@ export function SettingsDialog() {
             </div>
           </div>
           <p className="mt-1 font-mono text-2xs leading-relaxed text-muted">
-            SNAP fetches once on load. LIVE updates while this tab is open.
+            {guestDemo
+              ? "SNAP seed book. LIVE is available after sign-in."
+              : "SNAP fetches once on load. LIVE updates while this tab is open."}
           </p>
           <p className="mt-2 font-mono text-micro tracking-widest text-subtle uppercase">
             Live tape {TAPE_LABEL[tapeSource]} · bars {barsSource === "alpaca" ? "IEX" : barsSource === "yahoo" ? "YH" : "SEED"}
@@ -177,7 +209,12 @@ export function SettingsDialog() {
         ) : null}
 
         <div className="mt-4 flex flex-wrap gap-2">
-          <Button onClick={() => void save()} disabled={busy} size="lg" className="flex-1">
+          <Button
+            onClick={() => void save()}
+            disabled={busy || guestDemo}
+            size="lg"
+            className="flex-1"
+          >
             {busy ? "Connecting…" : "Save venue"}
           </Button>
           <Button
@@ -194,7 +231,7 @@ export function SettingsDialog() {
           </Button>
         </div>
 
-        <McpPanel open={open} />
+        {guestDemo ? null : <McpPanel open={open} />}
       </DialogContent>
     </Dialog>
   );
