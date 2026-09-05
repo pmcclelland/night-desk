@@ -11,6 +11,7 @@ import {
   type SimBook,
 } from "@/lib/sim";
 import { defaultStrategies } from "@/lib/strategies";
+import { sessionLiveFeed, sessionVenue } from "@/lib/tape-gate";
 import type {
   Account,
   Bar,
@@ -75,6 +76,8 @@ export interface DeskState {
   mobileTab: MobileTab;
   immersive: boolean;
   chartFocus: boolean;
+  /** Non-persisted. Signed-out public demo — overlays venue/feed to SIM + SNAP. */
+  guestDemo: boolean;
 
   setVenue: (v: Venue) => void;
   setCreds: (c: Creds | null) => void;
@@ -101,6 +104,7 @@ export interface DeskState {
   setImmersive: (v: boolean) => void;
   setChartFocus: (v: boolean) => void;
   toggleChartFocus: () => void;
+  setGuestDemo: (v: boolean) => void;
   resetSim: () => void;
   applyServerDesk: (d: {
     venue: Venue;
@@ -159,6 +163,7 @@ export const useDesk = create<DeskState>()(
       mobileTab: "chart",
       immersive: false,
       chartFocus: false,
+      guestDemo: false,
 
       setVenue: (v) => set({ venue: v, connected: v === "sim", connectError: null }),
       setCreds: (c) => set({ creds: c }),
@@ -195,14 +200,19 @@ export const useDesk = create<DeskState>()(
       setImmersive: (v) => set({ immersive: v }),
       setChartFocus: (v) => set({ chartFocus: v }),
       toggleChartFocus: () => set({ chartFocus: !get().chartFocus }),
+      setGuestDemo: (v) => set({ guestDemo: v }),
       resetSim: () =>
-        set({
-          sim: createStarterBook(),
-          venue: "sim",
-          halted: false,
-          connected: true,
-          connectError: null,
-        }),
+        set(
+          get().guestDemo
+            ? { sim: createStarterBook(), halted: false }
+            : {
+                sim: createStarterBook(),
+                venue: "sim",
+                halted: false,
+                connected: true,
+                connectError: null,
+              },
+        ),
       applyServerDesk: (d) => {
         const current = get().creds;
         const keepSecret =
@@ -247,23 +257,31 @@ export const useDesk = create<DeskState>()(
   ),
 );
 
+export function selectVenue(s: DeskState): Venue {
+  return sessionVenue(s.venue, s.guestDemo);
+}
+
+export function selectLiveFeed(s: DeskState): boolean {
+  return sessionLiveFeed(s.liveFeed, s.guestDemo);
+}
+
 export function selectAccount(s: DeskState): Account {
-  if (s.venue === "sim") return deriveAccount(s.sim, s.quotes);
+  if (selectVenue(s) === "sim") return deriveAccount(s.sim, s.quotes);
   return s.account ?? EMPTY_ACCOUNT;
 }
 
 export function selectPositions(s: DeskState): Position[] {
-  if (s.venue === "sim") return markPositions(s.sim.positions, s.quotes);
+  if (selectVenue(s) === "sim") return markPositions(s.sim.positions, s.quotes);
   return s.alpacaPositions;
 }
 
 export function selectOrders(s: DeskState): Order[] {
-  if (s.venue === "sim") return s.sim.orders;
+  if (selectVenue(s) === "sim") return s.sim.orders;
   return s.alpacaOrders;
 }
 
 export function useLiveBook() {
-  const venue = useDesk((s) => s.venue);
+  const venue = useDesk(selectVenue);
   const sim = useDesk((s) => s.sim);
   const quotes = useDesk((s) => s.quotes);
   const alpacaAccount = useDesk((s) => s.account);

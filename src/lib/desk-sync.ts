@@ -1,7 +1,7 @@
 import { mergeBotTapes } from "@/lib/bot-log";
 import { persistDesk, pullDesk } from "@/lib/server/desk-api";
-import { useDesk } from "@/lib/store";
-import { tapePollAllowed } from "@/lib/tape-gate";
+import { selectLiveFeed, useDesk } from "@/lib/store";
+import { sessionTapeAllowed } from "@/lib/tape-gate";
 
 let persistTimer: number | null = null;
 let hydrateFlight: Promise<void> | null = null;
@@ -43,7 +43,8 @@ export function selectSymbol(symbol: string) {
 }
 
 export async function hydrateDesk(opts?: { force?: boolean }) {
-  if (!tapePollAllowed(useDesk.getState().liveFeed, opts?.force)) return;
+  const s = useDesk.getState();
+  if (!sessionTapeAllowed(selectLiveFeed(s), s.guestDemo, opts?.force)) return;
   if (hydrateFlight) return hydrateFlight;
   hydrateFlight = (async () => {
     try {
@@ -64,6 +65,7 @@ export async function hydrateDesk(opts?: { force?: boolean }) {
 }
 
 export async function persistNow() {
+  if (useDesk.getState().guestDemo) return;
   const generation = ++persistGeneration;
   const selectedAtStart = useDesk.getState().selected;
   const s = useDesk.getState();
@@ -94,6 +96,7 @@ export async function persistNow() {
 
 export function queuePersist() {
   if (typeof window === "undefined") return;
+  if (useDesk.getState().guestDemo) return;
   if (persistTimer) window.clearTimeout(persistTimer);
   persistTimer = window.setTimeout(() => {
     persistTimer = null;

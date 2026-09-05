@@ -8,6 +8,8 @@ import {
   flattenAll,
   flattenSymbol,
   matchWorkingOrders,
+  quoteMapFromSeed,
+  seedBars,
   snapshotEquity,
   submitSimOrder,
 } from "@/lib/sim";
@@ -15,8 +17,8 @@ import { fetchBars, fetchQuotes } from "@/lib/server/market";
 import { pingAlpaca } from "@/lib/server/trade";
 import { refreshAlpacaBook, runDeskOp } from "@/lib/server/desk-api";
 import { applyPulledDesk, queuePersist, selectSymbol } from "@/lib/desk-sync";
-import { selectAccount, selectPositions, useDesk } from "@/lib/store";
-import { tapePollAllowed } from "@/lib/tape-gate";
+import { selectAccount, selectLiveFeed, selectPositions, selectVenue, useDesk } from "@/lib/store";
+import { sessionTapeAllowed } from "@/lib/tape-gate";
 import type { Account, Order, OrderRequest, Position, Venue } from "@/lib/types";
 
 export type TapeCall = { force?: boolean };
@@ -41,7 +43,18 @@ let barsFlightKey = "";
 let barsFlightGen = 0;
 
 export async function refreshQuotes(opts?: TapeCall) {
-  if (!tapePollAllowed(useDesk.getState().liveFeed, opts?.force)) return;
+  const state = useDesk.getState();
+  if (state.guestDemo) {
+    const symbols = unique([
+      state.selected,
+      ...state.watchlist,
+      ...state.sim.positions.map((p) => p.symbol),
+      ...state.strategies.map((st) => st.symbol),
+    ]).filter((sym) => !state.quotes[sym]);
+    if (symbols.length) state.setQuotes(quoteMapFromSeed(symbols), "seed");
+    return;
+  }
+  if (!sessionTapeAllowed(selectLiveFeed(state), state.guestDemo, opts?.force)) return;
   return singleFlight(quotesFlight, async () => {
     const s = useDesk.getState();
     const symbols = unique([
@@ -53,10 +66,11 @@ export async function refreshQuotes(opts?: TapeCall) {
     ]);
     try {
       const pack = await fetchQuotes({
-        data: { symbols, venue: s.venue },
+        data: { symbols, venue: selectVenue(s) },
       });
       const quotes = pack.quotes;
-      const { setQuotes, setSim, venue, sim, log } = useDesk.getState();
+      const { setQuotes, setSim, sim, log } = useDesk.getState();
+      const venue = selectVenue(useDesk.getState());
       setQuotes(quotes, pack.source);
       if (venue === "sim") {
         const matched = matchWorkingOrders(sim, quotes);
@@ -80,10 +94,15 @@ export async function refreshQuotes(opts?: TapeCall) {
 
 function barsKeyOf() {
   const s = useDesk.getState();
-  return `${s.selected}|${s.barRange}|${s.venue}`;
+  return `${s.selected}|${s.barRange}|${selectVenue(s)}`;
 }
 
 export async function refreshBars() {
+  const guest = useDesk.getState();
+  if (guest.guestDemo) {
+    guest.setBars(guest.selected, seedBars(guest.selected), "seed");
+    return;
+  }
   const key = barsKeyOf();
   if (barsFlight && barsFlightKey === key) return barsFlight;
   const gen = ++barsFlightGen;
@@ -93,7 +112,7 @@ export async function refreshBars() {
     try {
       const s = useDesk.getState();
       const pack = await fetchBars({
-        data: { symbol: s.selected, range: s.barRange, venue: s.venue },
+        data: { symbol: s.selected, range: s.barRange, venue: selectVenue(s) },
       });
       if (gen !== barsFlightGen) return;
       if (!pack.bars.length) {
@@ -130,8 +149,8 @@ function applyAlpacaExtra(extra?: {
 
 export async function refreshAlpaca(opts?: TapeCall) {
   const s = useDesk.getState();
-  if (s.venue === "sim") return;
-  if (!tapePollAllowed(s.liveFeed, opts?.force)) return;
+  if (selectVenue(s) === "sim") return;
+  if (!sessionTapeAllowed(selectLiveFeed(s), s.guestDemo, opts?.force)) return;
   return singleFlight(alpacaFlight, async () => {
     try {
       const snap = await refreshAlpacaBook();
@@ -175,7 +194,7 @@ export async function placeOrder(req: OrderRequest): Promise<{ ok: boolean; erro
     return { ok: false, error: msg };
   }
 
-  if (s.venue === "sim") {
+  if (selectVenue(s) === "sim") {
     const result = submitSimOrder(s.sim, s.quotes, req);
     s.setSim(result.book);
     if (result.error) {
@@ -214,7 +233,7 @@ export async function placeOrder(req: OrderRequest): Promise<{ ok: boolean; erro
 
 export async function cancelOrder(id: string) {
   const s = useDesk.getState();
-  if (s.venue === "sim") {
+  if (selectVenue(s) === "sim") {
     s.setSim(cancelSimOrder(s.sim, id));
     s.log("sys", `Canceled ${id}`);
     queuePersist();
@@ -231,7 +250,7 @@ export async function killSwitch(flattenBook: boolean) {
   const s = useDesk.getState();
   s.setHalted(true);
   s.setStrategies(s.strategies.map((st) => ({ ...st, armed: false })));
-  if (s.venue === "sim") {
+  if (selectVenue(s) === "sim") {
     let book = cancelAllSim(s.sim);
     if (flattenBook) book = flattenAll(book, s.quotes, "bot").book;
     s.setSim(book);
@@ -254,7 +273,7 @@ export async function killSwitch(flattenBook: boolean) {
 
 export async function flatten(symbol?: string) {
   const s = useDesk.getState();
-  if (s.venue === "sim") {
+  if (selectVenue(s) === "sim") {
     if (!symbol) {
       const r = flattenAll(s.sim, s.quotes, "bot");
       s.setSim(r.book);
@@ -278,12 +297,17 @@ export async function flatten(symbol?: string) {
 
 export async function connectAlpaca(venue: Venue, keyId: string, secret: string) {
   const s = useDesk.getState();
+  if (s.guestDemo && venue !== "sim") {
+    return { ok: false as const, error: "Sign in to connect Alpaca." };
+  }
   if (venue === "sim") {
     s.setVenue("sim");
     s.setCreds(null);
     s.setConnected(true);
     s.log("sys", "Venue SIM — local blotter, Yahoo delayed tape.");
-    void runDeskOp({ data: { op: "set_venue", venue: "sim" } }).catch(() => undefined);
+    if (!s.guestDemo) {
+      void runDeskOp({ data: { op: "set_venue", venue: "sim" } }).catch(() => undefined);
+    }
     queuePersist();
     return { ok: true as const };
   }
@@ -314,7 +338,7 @@ export async function connectAlpaca(venue: Venue, keyId: string, secret: string)
 
 export async function tickStrategies() {
   const s = useDesk.getState();
-  if (!tapePollAllowed(s.liveFeed)) return;
+  if (!sessionTapeAllowed(selectLiveFeed(s), s.guestDemo)) return;
   if (s.halted) return;
   const armed = s.strategies.filter((st) => st.armed);
   if (armed.length === 0) return;
@@ -322,7 +346,7 @@ export async function tickStrategies() {
     for (const st of armed) {
       try {
         const pack = await fetchBars({
-          data: { symbol: st.symbol, range: "6M", venue: s.venue },
+          data: { symbol: st.symbol, range: "6M", venue: selectVenue(s) },
         });
         const sig = evaluateStrategy(st, pack.bars);
         useDesk.getState().patchStrategy(st.id, { lastSignal: sig.action, note: sig.note });
@@ -362,10 +386,14 @@ export async function runThesis(symbol: string) {
   const last = s.quotes[symbol]?.last ?? 0;
   let bars = s.selected === symbol ? s.bars : [];
   if (bars.length < 30) {
-    const pack = await fetchBars({
-      data: { symbol, range: "6M", venue: s.venue },
-    });
-    bars = pack.bars;
+    if (s.guestDemo) {
+      bars = seedBars(symbol);
+    } else {
+      const pack = await fetchBars({
+        data: { symbol, range: "6M", venue: selectVenue(s) },
+      });
+      bars = pack.bars;
+    }
   }
   const local = localThesis(symbol, last || bars.at(-1)?.c || 0, bars);
   s.log("ai", local);
@@ -425,7 +453,7 @@ export async function runConsole(raw: string) {
     return;
   }
   if (cmd.op === "resume") {
-    if (s.venue === "sim") {
+    if (selectVenue(s) === "sim") {
       s.setHalted(false);
       s.log("sys", "Desk resumed");
       queuePersist();
@@ -442,7 +470,7 @@ export async function runConsole(raw: string) {
     return;
   }
   if (cmd.op === "cancel") {
-    if (s.venue === "sim") {
+    if (selectVenue(s) === "sim") {
       s.setSim(cancelAllSim(s.sim));
       s.log("sys", "Canceled working");
       queuePersist();

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { createFileRoute, Navigate } from "@tanstack/react-router";
+import { createFileRoute, Link, Navigate } from "@tanstack/react-router";
 import { authEnabled, signInWithGoogle } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { Button } from "@/components/ui/button";
@@ -41,7 +41,8 @@ function Login() {
           Sign in to the desk.
         </h1>
         <p className="mt-3 text-sm leading-relaxed text-muted">
-          Single operator. Continue with Google. The first account to sign in claims the desk.
+          Single operator. Continue with Google for paper/live. Or open the SIM desk without an
+          account.
         </p>
 
         <div className="mt-8 space-y-2">
@@ -63,6 +64,13 @@ function Login() {
             <p className="font-mono text-2xs text-muted">Sign-in is disabled.</p>
           )}
         </div>
+
+        <Link
+          to="/"
+          className="mt-8 inline-block font-mono text-xs tracking-widest text-accent uppercase hover:text-fg"
+        >
+          Open SIM desk
+        </Link>
       </div>
     </main>
   );
