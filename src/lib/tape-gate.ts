@@ -6,12 +6,11 @@ export function tapePollAllowed(liveFeed: boolean, force = false) {
 }
 
 /**
- * Logged-out public demo: lock SNAP and never spend tape — not even a boot snapshot.
- * Signed-in callers fall through to {@link tapePollAllowed}.
+ * Quote/bar polls. Guests are forced LIVE (real tape). Signed-in use Settings.
+ * Hydrate/persist stay guest-blocked at the call site — this gate is tape only.
  */
 export function sessionTapeAllowed(liveFeed: boolean, guest: boolean, force = false) {
-  if (guest) return false;
-  return tapePollAllowed(liveFeed, force);
+  return tapePollAllowed(sessionLiveFeed(liveFeed, guest), force);
 }
 
 /** Logged-out visitors are always SIM. Signed-in keep their stored venue. */
@@ -19,7 +18,7 @@ export function sessionVenue(venue: Venue, guest: boolean): Venue {
   return guest ? "sim" : venue;
 }
 
-/** Logged-out visitors are always SNAP. Signed-in keep Settings → Updates. */
+/** Logged-out visitors are forced LIVE tape. Signed-in keep Settings → Updates. */
 export function sessionLiveFeed(liveFeed: boolean, guest: boolean) {
-  return guest ? false : liveFeed;
+  return guest ? true : liveFeed;
 }

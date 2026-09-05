@@ -67,7 +67,7 @@ export function SettingsDialog() {
         <DialogTitle>Desk settings</DialogTitle>
         <DialogDescription>
           {guestDemo
-            ? "Public demo is locked to SIM with the seed book. Sign in to connect Alpaca or turn LIVE on."
+            ? "Public demo is locked to a SIM book. Tape is LIVE Yahoo. Sign in to connect Alpaca."
             : "Alpaca keys are encrypted on the operator desk so a Grok Bot can trade through MCP. SIM needs no keys."}
         </DialogDescription>
 
@@ -130,9 +130,7 @@ export function SettingsDialog() {
           <p className="font-mono text-micro tracking-widest text-subtle uppercase">Market data</p>
           {guestDemo || draftVenue === "sim" ? (
             <p className="mt-1 font-mono text-2xs leading-relaxed text-muted">
-              {guestDemo
-                ? "Seed quotes and candles. Local $100k sim book. No live tape."
-                : "Quotes and candles from Yahoo Finance (delayed). Book is the local $100k sim. No keys."}
+              Quotes and candles from Yahoo Finance (delayed). Book is the local $100k sim. No keys.
             </p>
           ) : (
             <p className="mt-1 font-mono text-2xs leading-relaxed text-muted">
@@ -153,13 +151,13 @@ export function SettingsDialog() {
                     if (guestDemo) return;
                     setLiveFeed(m.on);
                   }}
-                  disabled={guestDemo && m.on}
+                  disabled={guestDemo && !m.on}
                   aria-pressed={liveFeed === m.on}
                   className={cn(
                     "h-6 px-1.5 font-mono text-micro tracking-wide",
                     i > 0 && "border-l border-border",
                     liveFeed === m.on ? "text-accent" : "text-subtle hover:text-fg",
-                    guestDemo && m.on && "cursor-not-allowed opacity-40 hover:text-subtle",
+                    guestDemo && !m.on && "cursor-not-allowed opacity-40 hover:text-subtle",
                   )}
                 >
                   {m.label}
@@ -169,7 +167,7 @@ export function SettingsDialog() {
           </div>
           <p className="mt-1 font-mono text-2xs leading-relaxed text-muted">
             {guestDemo
-              ? "SNAP seed book. LIVE is available after sign-in."
+              ? "LIVE Yahoo tape while this tab is open. SNAP is available after sign-in."
               : "SNAP fetches once on load. LIVE updates while this tab is open."}
           </p>
           <p className="mt-2 font-mono text-micro tracking-widest text-subtle uppercase">

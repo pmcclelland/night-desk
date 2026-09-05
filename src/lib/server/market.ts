@@ -245,6 +245,11 @@ export const fetchQuotes = createServerFn({ method: "POST" })
     });
   });
 
+/** Yahoo/sim tape for signed-out visitors. Never reads Alpaca keys or a desk row. */
+export const fetchPublicQuotes = createServerFn({ method: "POST" })
+  .validator((input: { symbols: string[] }) => input)
+  .handler(async ({ data }) => loadQuotes({ symbols: data.symbols, venue: "sim" }));
+
 interface YahooChart {
   chart?: {
     result?: Array<{
@@ -389,3 +394,8 @@ export const fetchBars = createServerFn({ method: "POST" })
       creds: resolved.creds,
     });
   });
+
+/** Yahoo/sim candles for signed-out visitors. Never reads Alpaca keys or a desk row. */
+export const fetchPublicBars = createServerFn({ method: "POST" })
+  .validator((input: { symbol: string; range: BarRange }) => input)
+  .handler(async ({ data }) => loadBars({ symbol: data.symbol, range: data.range, venue: "sim" }));

@@ -44,6 +44,7 @@ export function selectSymbol(symbol: string) {
 
 export async function hydrateDesk(opts?: { force?: boolean }) {
   const s = useDesk.getState();
+  if (s.guestDemo) return;
   if (!sessionTapeAllowed(selectLiveFeed(s), s.guestDemo, opts?.force)) return;
   if (hydrateFlight) return hydrateFlight;
   hydrateFlight = (async () => {

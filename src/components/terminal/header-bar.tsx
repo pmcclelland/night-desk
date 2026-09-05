@@ -57,8 +57,9 @@ export function HeaderBar() {
         <span
           title={tape.title}
           className={cn(
-            "hidden font-mono text-micro tracking-widest uppercase md:inline",
+            "font-mono text-micro tracking-widest uppercase",
             tapeWarn ? "text-down" : "text-subtle",
+            !guestDemo && "hidden md:inline",
           )}
         >
           {tape.label}

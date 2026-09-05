@@ -14,11 +14,10 @@ describe("tapePollAllowed", () => {
 });
 
 describe("sessionTapeAllowed", () => {
-  it("blocks every tape call for a logged-out guest, including force", () => {
-    assert.equal(sessionTapeAllowed(false, true), false);
-    assert.equal(sessionTapeAllowed(true, true), false);
-    assert.equal(sessionTapeAllowed(true, true, true), false);
-    assert.equal(sessionTapeAllowed(false, true, true), false);
+  it("lets guests poll tape even if stored SNAP is off", () => {
+    assert.equal(sessionTapeAllowed(false, true), true);
+    assert.equal(sessionTapeAllowed(true, true), true);
+    assert.equal(sessionTapeAllowed(false, true, true), true);
   });
 
   it("matches tapePollAllowed when signed in", () => {
@@ -29,13 +28,13 @@ describe("sessionTapeAllowed", () => {
 });
 
 describe("session overlays", () => {
-  it("forces SIM + SNAP while logged out and leaves stored settings alone when signed in", () => {
+  it("forces SIM + LIVE tape while logged out and leaves stored settings alone when signed in", () => {
     assert.equal(sessionVenue("alpaca-live", true), "sim");
     assert.equal(sessionVenue("alpaca-paper", true), "sim");
     assert.equal(sessionVenue("sim", true), "sim");
     assert.equal(sessionVenue("alpaca-live", false), "alpaca-live");
-    assert.equal(sessionLiveFeed(true, true), false);
-    assert.equal(sessionLiveFeed(false, true), false);
+    assert.equal(sessionLiveFeed(true, true), true);
+    assert.equal(sessionLiveFeed(false, true), true);
     assert.equal(sessionLiveFeed(true, false), true);
     assert.equal(sessionLiveFeed(false, false), false);
   });
