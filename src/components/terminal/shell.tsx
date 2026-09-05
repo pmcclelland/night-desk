@@ -15,7 +15,6 @@ import { selectLiveFeed, selectVenue, useDesk, type MobileTab } from "@/lib/stor
 import { startLiveLoop, stopLiveLoop } from "@/lib/live-loop";
 import { refreshAlpaca, refreshBars, refreshQuotes, tickStrategies } from "@/lib/sync";
 import { hydrateDesk } from "@/lib/desk-sync";
-import { seedBars } from "@/lib/sim";
 import {
   exitNativeFullscreen,
   isNativeFullscreen,
@@ -62,14 +61,14 @@ export function TerminalShell({ guest = false }: { guest?: boolean }) {
       s.log(
         "sys",
         guest
-          ? "NIGHTDESK online. Venue SIM (public demo). Type HELP. Sign in for paper/live."
+          ? "NIGHTDESK online. Venue SIM (public demo). Yahoo tape LIVE. Sign in for paper/live."
           : "NIGHTDESK online. Venue SIM. Type HELP. Freeform goes to the Grok Bot.",
       );
     }
     if (guest) {
       live.current = true;
-      s.setQuotes(s.quotes, "seed");
-      s.setBars(s.selected, seedBars(s.selected), "seed");
+      void refreshQuotes({ force: true });
+      void refreshBars();
       return;
     }
     void hydrateDesk({ force: true }).then(() => {

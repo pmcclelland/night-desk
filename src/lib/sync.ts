@@ -8,18 +8,16 @@ import {
   flattenAll,
   flattenSymbol,
   matchWorkingOrders,
-  quoteMapFromSeed,
-  seedBars,
   snapshotEquity,
   submitSimOrder,
 } from "@/lib/sim";
-import { fetchBars, fetchQuotes } from "@/lib/server/market";
+import { fetchBars, fetchPublicBars, fetchPublicQuotes, fetchQuotes } from "@/lib/server/market";
 import { pingAlpaca } from "@/lib/server/trade";
 import { refreshAlpacaBook, runDeskOp } from "@/lib/server/desk-api";
 import { applyPulledDesk, queuePersist, selectSymbol } from "@/lib/desk-sync";
 import { selectAccount, selectLiveFeed, selectPositions, selectVenue, useDesk } from "@/lib/store";
 import { sessionTapeAllowed } from "@/lib/tape-gate";
-import type { Account, Order, OrderRequest, Position, Venue } from "@/lib/types";
+import type { Account, BarRange, Order, OrderRequest, Position, Venue } from "@/lib/types";
 
 export type TapeCall = { force?: boolean };
 
@@ -42,18 +40,22 @@ let barsFlight: Promise<void> | null = null;
 let barsFlightKey = "";
 let barsFlightGen = 0;
 
+async function loadTapeQuotes(symbols: string[], venue: Venue) {
+  if (useDesk.getState().guestDemo) {
+    return fetchPublicQuotes({ data: { symbols } });
+  }
+  return fetchQuotes({ data: { symbols, venue } });
+}
+
+async function loadTapeBars(symbol: string, range: BarRange, venue: Venue) {
+  if (useDesk.getState().guestDemo) {
+    return fetchPublicBars({ data: { symbol, range } });
+  }
+  return fetchBars({ data: { symbol, range, venue } });
+}
+
 export async function refreshQuotes(opts?: TapeCall) {
   const state = useDesk.getState();
-  if (state.guestDemo) {
-    const symbols = unique([
-      state.selected,
-      ...state.watchlist,
-      ...state.sim.positions.map((p) => p.symbol),
-      ...state.strategies.map((st) => st.symbol),
-    ]).filter((sym) => !state.quotes[sym]);
-    if (symbols.length) state.setQuotes(quoteMapFromSeed(symbols), "seed");
-    return;
-  }
   if (!sessionTapeAllowed(selectLiveFeed(state), state.guestDemo, opts?.force)) return;
   return singleFlight(quotesFlight, async () => {
     const s = useDesk.getState();
@@ -65,9 +67,7 @@ export async function refreshQuotes(opts?: TapeCall) {
       ...s.strategies.map((st) => st.symbol),
     ]);
     try {
-      const pack = await fetchQuotes({
-        data: { symbols, venue: selectVenue(s) },
-      });
+      const pack = await loadTapeQuotes(symbols, selectVenue(s));
       const quotes = pack.quotes;
       const { setQuotes, setSim, sim, log } = useDesk.getState();
       const venue = selectVenue(useDesk.getState());
@@ -98,11 +98,6 @@ function barsKeyOf() {
 }
 
 export async function refreshBars() {
-  const guest = useDesk.getState();
-  if (guest.guestDemo) {
-    guest.setBars(guest.selected, seedBars(guest.selected), "seed");
-    return;
-  }
   const key = barsKeyOf();
   if (barsFlight && barsFlightKey === key) return barsFlight;
   const gen = ++barsFlightGen;
@@ -111,9 +106,7 @@ export async function refreshBars() {
     useDesk.getState().setBarsLoading(true);
     try {
       const s = useDesk.getState();
-      const pack = await fetchBars({
-        data: { symbol: s.selected, range: s.barRange, venue: selectVenue(s) },
-      });
+      const pack = await loadTapeBars(s.selected, s.barRange, selectVenue(s));
       if (gen !== barsFlightGen) return;
       if (!pack.bars.length) {
         useDesk.getState().setBarsLoading(false);
@@ -345,9 +338,7 @@ export async function tickStrategies() {
   return singleFlight(strategyFlight, async () => {
     for (const st of armed) {
       try {
-        const pack = await fetchBars({
-          data: { symbol: st.symbol, range: "6M", venue: selectVenue(s) },
-        });
+        const pack = await loadTapeBars(st.symbol, "6M", selectVenue(s));
         const sig = evaluateStrategy(st, pack.bars);
         useDesk.getState().patchStrategy(st.id, { lastSignal: sig.action, note: sig.note });
         if (Date.now() - st.lastFiredAt < 15 * 60_000 && st.lastFiredAt !== 0) continue;
@@ -386,14 +377,8 @@ export async function runThesis(symbol: string) {
   const last = s.quotes[symbol]?.last ?? 0;
   let bars = s.selected === symbol ? s.bars : [];
   if (bars.length < 30) {
-    if (s.guestDemo) {
-      bars = seedBars(symbol);
-    } else {
-      const pack = await fetchBars({
-        data: { symbol, range: "6M", venue: selectVenue(s) },
-      });
-      bars = pack.bars;
-    }
+    const pack = await loadTapeBars(symbol, "6M", selectVenue(s));
+    bars = pack.bars;
   }
   const local = localThesis(symbol, last || bars.at(-1)?.c || 0, bars);
   s.log("ai", local);
