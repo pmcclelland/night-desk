@@ -77,72 +77,45 @@
   select {
     font: inherit;
   }
+}
 
-  /*
-   * Thin, low-contrast scrollbars for every overflow panel (watch, blotter,
-   * ticket, algos, bot tape, settings, login). Firefox inherits from html;
-   * WebKit needs the pseudo-elements on all scrollers (*). Never hide the
-   * thumb entirely — a faint idle bar still cues overflow.
-   */
-  html {
-    scrollbar-width: thin;
-    scrollbar-color: var(--nd-scrollbar-thumb) var(--nd-scrollbar-track);
-  }
+/*
+ * Thin, low-contrast scrollbars for every overflow panel (watch, blotter,
+ * ticket, algos, bot tape, settings, login). Kept unlayered: Chromium ignores
+ * ::-webkit-scrollbar inside @layer and keeps the native grey overlay bar.
+ * Firefox inherits scrollbar-* from html. Never display:none the thumb.
+ */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--nd-scrollbar-thumb) var(--nd-scrollbar-track);
+}
 
-  *::-webkit-scrollbar {
-    width: var(--nd-scrollbar-size);
-    height: var(--nd-scrollbar-size);
-  }
+*::-webkit-scrollbar {
+  width: var(--nd-scrollbar-size);
+  height: var(--nd-scrollbar-size);
+}
 
-  *::-webkit-scrollbar-track {
-    background: var(--nd-scrollbar-track);
-  }
+*::-webkit-scrollbar-track {
+  background: var(--nd-scrollbar-track);
+}
 
-  *::-webkit-scrollbar-thumb {
-    background-color: var(--nd-scrollbar-thumb);
-    border-radius: 999px;
-  }
+*::-webkit-scrollbar-thumb {
+  background-color: var(--nd-scrollbar-thumb);
+  border-radius: 999px;
+}
 
-  *::-webkit-scrollbar-thumb:hover {
-    background-color: var(--nd-scrollbar-thumb-hover);
-  }
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--nd-scrollbar-thumb-hover);
+}
 
-  *::-webkit-scrollbar-corner {
-    background: transparent;
-  }
+*::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 /* Same recipe, opt-in. Global rules already cover overflow:auto panels. */
 .nd-scroll {
   scrollbar-width: thin;
   scrollbar-color: var(--nd-scrollbar-thumb) var(--nd-scrollbar-track);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  html {
-    scrollbar-color: color-mix(in oklab, var(--nd-scrollbar-thumb) 45%, transparent)
-      var(--nd-scrollbar-track);
-  }
-
-  *:hover,
-  *:focus-within {
-    scrollbar-color: var(--nd-scrollbar-thumb) var(--nd-scrollbar-track);
-  }
-
-  *::-webkit-scrollbar-thumb {
-    background-color: color-mix(in oklab, var(--nd-scrollbar-thumb) 45%, transparent);
-  }
-
-  *:hover::-webkit-scrollbar-thumb,
-  *:focus-within::-webkit-scrollbar-thumb,
-  *::-webkit-scrollbar-thumb:hover {
-    background-color: var(--nd-scrollbar-thumb);
-  }
-
-  *:hover::-webkit-scrollbar-thumb:hover,
-  *:focus-within::-webkit-scrollbar-thumb:hover {
-    background-color: var(--nd-scrollbar-thumb-hover);
-  }
 }
 
 .tape-track {
