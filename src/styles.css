@@ -41,6 +41,12 @@
   --ease-in-out: ease-in-out;
   --motion-y-micro: 4px;
   --motion-scale-modal: 0.96;
+
+  /* Terminal scrollbars — Atelier: tweak size / thumb here, not per panel. */
+  --nd-scrollbar-size: 6px;
+  --nd-scrollbar-thumb: color-mix(in oklab, var(--color-subtle) 70%, transparent);
+  --nd-scrollbar-thumb-hover: color-mix(in oklab, var(--color-muted) 80%, transparent);
+  --nd-scrollbar-track: transparent;
 }
 
 @layer base {
@@ -71,6 +77,45 @@
   select {
     font: inherit;
   }
+}
+
+/*
+ * Thin, low-contrast scrollbars for every overflow panel (watch, blotter,
+ * ticket, algos, bot tape, settings, login). Kept unlayered: Chromium ignores
+ * ::-webkit-scrollbar inside @layer and keeps the native grey overlay bar.
+ * Firefox inherits scrollbar-* from html. Never display:none the thumb.
+ */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--nd-scrollbar-thumb) var(--nd-scrollbar-track);
+}
+
+*::-webkit-scrollbar {
+  width: var(--nd-scrollbar-size);
+  height: var(--nd-scrollbar-size);
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--nd-scrollbar-track);
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: var(--nd-scrollbar-thumb);
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--nd-scrollbar-thumb-hover);
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Same recipe, opt-in. Global rules already cover overflow:auto panels. */
+.nd-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--nd-scrollbar-thumb) var(--nd-scrollbar-track);
 }
 
 .tape-track {
