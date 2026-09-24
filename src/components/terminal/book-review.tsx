@@ -244,7 +244,7 @@ export function BookReview() {
         </div>
       ) : (
         <div className="min-h-0 flex-1 overflow-auto">
-          <table className="w-full font-mono text-2xs tabular-nums">
+          <table className="w-full border-separate border-spacing-0 font-mono text-2xs tabular-nums">
             <thead className="sticky top-0 bg-surface text-micro tracking-widest text-subtle uppercase">
               <tr>
                 <th className="w-px whitespace-nowrap border-l-2 border-transparent px-2 py-1 text-left font-medium">
