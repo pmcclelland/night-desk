@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import {
   formatThesisAge,
@@ -85,6 +85,7 @@ export function BookReview() {
   const [cursor, setCursor] = useState(() => selected);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [form, setForm] = useState<ThesisForm>(EMPTY_FORM);
+  const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
 
   useEffect(() => {
     if (guest) {
@@ -135,6 +136,7 @@ export function BookReview() {
   useEffect(() => {
     if (!expanded) return;
     setForm(formFromThesis(theses[expanded] ?? null));
+    rowRefs.current[expanded]?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, [expanded, theses]);
 
   useEffect(() => {
@@ -245,7 +247,9 @@ export function BookReview() {
           <table className="w-full font-mono text-2xs tabular-nums">
             <thead className="sticky top-0 bg-surface text-micro tracking-widest text-subtle uppercase">
               <tr>
-                <th className="w-px whitespace-nowrap px-2 py-1 text-left font-medium">Sym</th>
+                <th className="w-px whitespace-nowrap border-l-2 border-transparent px-2 py-1 text-left font-medium">
+                  Sym
+                </th>
                 <th className="hidden w-px whitespace-nowrap px-2 py-1 text-right font-medium sm:table-cell">
                   Qty
                 </th>
@@ -266,74 +270,91 @@ export function BookReview() {
               {view.positions.map((p) => {
                 const active = p.symbol === cursor;
                 const open = expanded === p.symbol;
+                const marked = active || open;
                 return (
-                  <tr
-                    key={p.symbol}
-                    data-symbol={p.symbol}
-                    data-last={String(p.last)}
-                    className={cn(
-                      "cursor-pointer border-t border-border/60",
-                      active ? "bg-elevated" : "hover:bg-elevated/60",
-                    )}
-                    onClick={() => {
-                      setCursor(p.symbol);
-                      selectSymbol(p.symbol);
-                      setExpanded(p.symbol);
-                    }}
-                  >
-                    <td className="w-px whitespace-nowrap px-2 py-1.5 text-left text-fg">{p.symbol}</td>
-                    <td className="hidden w-px whitespace-nowrap px-2 py-1.5 text-right sm:table-cell">
-                      {qty(p.qty)}
-                    </td>
-                    <td className="hidden w-px whitespace-nowrap px-2 py-1.5 text-right md:table-cell">
-                      {pct(p.weightPct, false)}
-                    </td>
-                    <td className="hidden w-px whitespace-nowrap px-2 py-1.5 text-right text-muted sm:table-cell">
-                      {px(p.avgPrice)}
-                    </td>
-                    <td className={cn("w-px whitespace-nowrap px-2 py-1.5 text-right", signClass(p.unrealizedPl))}>
-                      {signedMoney(p.unrealizedPl)}{" "}
-                      <span className="text-micro">{pct(p.unrealizedPlPct)}</span>
-                    </td>
-                    <td
+                  <Fragment key={p.symbol}>
+                    <tr
+                      ref={(el) => {
+                        rowRefs.current[p.symbol] = el;
+                      }}
+                      data-symbol={p.symbol}
+                      data-last={String(p.last)}
                       className={cn(
-                        "hidden w-px whitespace-nowrap px-2 py-1.5 text-right md:table-cell",
-                        signClass(p.dayPl),
+                        "cursor-pointer border-t border-border/60",
+                        marked ? "bg-elevated" : "hover:bg-elevated/60",
                       )}
+                      onClick={() => {
+                        setCursor(p.symbol);
+                        selectSymbol(p.symbol);
+                        setExpanded(p.symbol);
+                      }}
                     >
-                      {signedMoney(p.dayPl)}{" "}
-                      <span className="text-micro">{pct(p.dayPlPct)}</span>
-                    </td>
-                    <td className="w-full px-2 py-1.5 text-left text-subtle">
-                      <span className="flex max-w-[60ch] items-baseline gap-2">
-                        <span className={cn("min-w-0 truncate", open && "text-fg")}>
-                          {p.thesis?.reasoning || "—"}
+                      <td
+                        className={cn(
+                          "w-px whitespace-nowrap border-l-2 px-2 py-1.5 text-left text-fg",
+                          marked ? "border-accent" : "border-transparent",
+                        )}
+                      >
+                        {p.symbol}
+                      </td>
+                      <td className="hidden w-px whitespace-nowrap px-2 py-1.5 text-right sm:table-cell">
+                        {qty(p.qty)}
+                      </td>
+                      <td className="hidden w-px whitespace-nowrap px-2 py-1.5 text-right md:table-cell">
+                        {pct(p.weightPct, false)}
+                      </td>
+                      <td className="hidden w-px whitespace-nowrap px-2 py-1.5 text-right text-muted sm:table-cell">
+                        {px(p.avgPrice)}
+                      </td>
+                      <td className={cn("w-px whitespace-nowrap px-2 py-1.5 text-right", signClass(p.unrealizedPl))}>
+                        {signedMoney(p.unrealizedPl)}{" "}
+                        <span className="text-micro">{pct(p.unrealizedPlPct)}</span>
+                      </td>
+                      <td
+                        className={cn(
+                          "hidden w-px whitespace-nowrap px-2 py-1.5 text-right md:table-cell",
+                          signClass(p.dayPl),
+                        )}
+                      >
+                        {signedMoney(p.dayPl)}{" "}
+                        <span className="text-micro">{pct(p.dayPlPct)}</span>
+                      </td>
+                      <td className="w-full min-w-0 max-w-0 px-2 py-1.5 text-left">
+                        <span className="flex min-w-0 items-baseline gap-2">
+                          <span className="min-w-0 truncate text-subtle">{p.thesis?.reasoning || "—"}</span>
+                          {p.health?.stale ? (
+                            <span className="shrink-0 text-micro tracking-widest text-down uppercase">Stale</span>
+                          ) : p.health ? (
+                            <span className="shrink-0 text-micro tracking-widest text-subtle uppercase">
+                              {formatThesisAge(p.health.ageDays)}
+                            </span>
+                          ) : null}
                         </span>
-                        {p.health?.stale ? (
-                          <span className="shrink-0 text-micro tracking-widest text-down uppercase">Stale</span>
-                        ) : p.health ? (
-                          <span className="shrink-0 text-micro tracking-widest text-subtle uppercase">
-                            {formatThesisAge(p.health.ageDays)}
-                          </span>
-                        ) : null}
-                      </span>
-                    </td>
-                  </tr>
+                      </td>
+                    </tr>
+                    {open && openRow ? (
+                      <tr>
+                        <td
+                          colSpan={7}
+                          className="border-l-2 border-accent bg-surface p-0"
+                        >
+                          <ThesisEditor
+                            row={openRow}
+                            form={form}
+                            guest={guest}
+                            saving={saving}
+                            onChange={setForm}
+                            onSave={() => void saveExpanded()}
+                            onClose={() => setExpanded(null)}
+                          />
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
                 );
               })}
             </tbody>
           </table>
-          {openRow ? (
-            <ThesisEditor
-              row={openRow}
-              form={form}
-              guest={guest}
-              saving={saving}
-              onChange={setForm}
-              onSave={() => void saveExpanded()}
-              onClose={() => setExpanded(null)}
-            />
-          ) : null}
         </div>
       )}
       <p className="shrink-0 border-t border-border px-3 py-2 font-mono text-micro tracking-widest text-subtle uppercase">
@@ -343,48 +364,6 @@ export function BookReview() {
   );
 }
 
-function signalsBody(
-  signals: SignalsSnapshot | { status: "loading" },
-  symbols: string[],
-) {
-  switch (signals.status) {
-    case "loading":
-      return <p className="mt-2 font-mono text-2xs text-subtle">Checking signals…</p>;
-    case "disconnected":
-      return <p className="mt-2 font-mono text-2xs text-muted">{SIGNALS_NOT_CONNECTED}</p>;
-    case "connected":
-      if (symbols.length === 0) {
-        return <p className="mt-2 font-mono text-2xs text-subtle">No held names</p>;
-      }
-      return (
-        <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">
-          {symbols.map((sym) => {
-            const row = signals.byTicker[sym];
-            return (
-              <li key={sym} className="min-w-0 font-mono text-2xs">
-                <span className="text-fg">{sym}</span>
-                {row ? (
-                  <span className="text-muted">
-                    {" "}
-                    {row.direction ?? "—"} · {row.convictionLabel ?? "—"}
-                    {row.thesisSummary ? ` · ${row.thesisSummary}` : ""}
-                  </span>
-                ) : (
-                  <span className="text-subtle"> —</span>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      );
-    default: {
-      const _exhaustive: never = signals;
-      void _exhaustive;
-      return null;
-    }
-  }
-}
-
 function SignalsPanel({
   symbols,
   signals,
@@ -392,12 +371,52 @@ function SignalsPanel({
   symbols: string[];
   signals: SignalsSnapshot | { status: "loading" };
 }) {
-  return (
-    <section className="shrink-0 border-b border-border bg-surface px-3 py-2">
-      <p className="font-mono text-micro tracking-widest text-accent uppercase">Brain</p>
-      {signalsBody(signals, symbols)}
-    </section>
-  );
+  switch (signals.status) {
+    case "loading":
+    case "disconnected":
+      return (
+        <section className="flex shrink-0 items-baseline gap-2 border-b border-border bg-surface px-3 py-2">
+          <p className="font-mono text-micro tracking-widest text-accent uppercase">Brain</p>
+          <p className="font-mono text-micro text-subtle">
+            {signals.status === "disconnected" ? SIGNALS_NOT_CONNECTED : "Checking signals…"}
+          </p>
+        </section>
+      );
+    case "connected":
+      return (
+        <section className="shrink-0 border-b border-border bg-surface px-3 py-2">
+          <p className="font-mono text-micro tracking-widest text-accent uppercase">Brain</p>
+          {symbols.length === 0 ? (
+            <p className="mt-2 font-mono text-2xs text-subtle">No held names</p>
+          ) : (
+            <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">
+              {symbols.map((sym) => {
+                const row = signals.byTicker[sym];
+                return (
+                  <li key={sym} className="min-w-0 font-mono text-2xs">
+                    <span className="text-fg">{sym}</span>
+                    {row ? (
+                      <span className="text-muted">
+                        {" "}
+                        {row.direction ?? "—"} · {row.convictionLabel ?? "—"}
+                        {row.thesisSummary ? ` · ${row.thesisSummary}` : ""}
+                      </span>
+                    ) : (
+                      <span className="text-subtle"> —</span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+      );
+    default: {
+      const _exhaustive: never = signals;
+      void _exhaustive;
+      return null;
+    }
+  }
 }
 
 function ThesisEditor({
@@ -467,21 +486,24 @@ function ThesisEditor({
 
       <div className="mt-3">
         <p className="font-mono text-micro tracking-widest text-subtle uppercase">Conviction</p>
-        <div className="mt-1 flex items-center">
+        <div role="group" aria-label="Conviction" className="mt-1 flex items-center">
           {CONVICTIONS.map((c, i) => (
-            <button
-              key={c}
-              type="button"
-              aria-pressed={form.conviction === c}
-              onClick={() => onChange({ ...form, conviction: form.conviction === c ? null : c })}
-              className={cn(
-                "h-11 px-2 font-mono text-micro tracking-widest uppercase sm:h-7",
-                i > 0 && "border-l border-border",
-                form.conviction === c ? "text-accent" : "text-subtle hover:text-fg",
-              )}
-            >
-              {c}
-            </button>
+            <Fragment key={c}>
+              {i > 0 ? (
+                <span className="mx-0.5 inline-block h-3 w-px shrink-0 self-center bg-border" aria-hidden />
+              ) : null}
+              <button
+                type="button"
+                aria-pressed={form.conviction === c}
+                onClick={() => onChange({ ...form, conviction: form.conviction === c ? null : c })}
+                className={cn(
+                  "px-1.5 py-2.5 font-mono text-2xs leading-6 tracking-widest uppercase md:py-2",
+                  form.conviction === c ? "text-accent" : "text-subtle hover:text-fg",
+                )}
+              >
+                {c}
+              </button>
+            </Fragment>
           ))}
         </div>
       </div>
@@ -496,8 +518,8 @@ function ThesisEditor({
         />
       </label>
 
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <label>
+      <div className="mt-3 flex items-end gap-3">
+        <label className="min-w-0 flex-1">
           <span className="font-mono text-micro tracking-widest text-subtle uppercase">Invalidation</span>
           <Input
             value={form.invalidation}
@@ -505,13 +527,13 @@ function ThesisEditor({
             className="mt-1 h-11 text-2xs sm:h-9"
           />
         </label>
-        <label>
+        <label className="w-[12ch] shrink-0">
           <span className="font-mono text-micro tracking-widest text-subtle uppercase">Target</span>
           <Input
             value={form.target}
             onChange={(e) => onChange({ ...form, target: e.target.value })}
             inputMode="decimal"
-            className="mt-1 h-11 text-2xs sm:h-9"
+            className="mt-1 h-11 w-full text-2xs tabular-nums sm:h-9"
           />
         </label>
       </div>
