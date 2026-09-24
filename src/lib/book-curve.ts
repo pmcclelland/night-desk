@@ -169,6 +169,40 @@ export function formatCurveAxis(n: number): string {
   return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function niceNum(range: number, round: boolean) {
+  const exp = Math.floor(Math.log10(range));
+  const f = range / 10 ** exp;
+  let nf: number;
+  if (round) {
+    if (f < 1.5) nf = 1;
+    else if (f < 3) nf = 2;
+    else if (f < 7) nf = 5;
+    else nf = 10;
+  } else if (f <= 1) nf = 1;
+  else if (f <= 2) nf = 2;
+  else if (f <= 5) nf = 5;
+  else nf = 10;
+  return nf * 10 ** exp;
+}
+
+export function niceTicks(min: number, max: number, count = 5) {
+  const range = niceNum(max - min || 1, false);
+  const step = niceNum(range / (count - 1), true);
+  const start = Math.floor(min / step) * step;
+  const out: number[] = [];
+  for (let v = start; v <= max + step / 2; v += step) out.push(v);
+  return out;
+}
+
+/** Nice ticks from the raw series, then pad so the floor is not a gridline. */
+export function curvePlotScale(lo: number, hi: number) {
+  const span = (Number.isFinite(hi) && Number.isFinite(lo) ? hi - lo : 0) || 1;
+  const min = lo - span * 0.08;
+  const max = hi + span * 0.08;
+  const ticks = niceTicks(lo, hi, 5).filter((t) => t > lo + span * 1e-6);
+  return { min, max, ticks };
+}
+
 export function barsToPoints(bars: Bar[]): EquityPoint[] {
   return bars
     .filter((b) => Number.isFinite(b.t) && Number.isFinite(b.c))

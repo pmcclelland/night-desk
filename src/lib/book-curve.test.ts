@@ -5,6 +5,7 @@ import {
   clipEquityForCurve,
   curveWindow,
   nextCurveRange,
+  curvePlotScale,
   formatCurveAxis,
   rebaseToStart,
   reconstructSimCurve,
@@ -118,6 +119,14 @@ describe("book-curve", () => {
   it("seriesReturn is null on an empty or zero start", () => {
     assert.equal(seriesReturn([]), null);
     assert.equal(seriesReturn([pt("2026-09-22", 0), pt("2026-09-23", 10)]), null);
+  });
+
+  it("pads the plot after nicing so the series floor is not a gridline", () => {
+    const { min, max, ticks } = curvePlotScale(103_000, 104_500);
+    assert.ok(min < 103_000);
+    assert.ok(max > 104_500);
+    assert.equal(ticks.includes(103_000), false);
+    assert.ok(ticks.some((t) => t > 103_000));
   });
 
   it("formats axis labels with grouping on both large and small values", () => {

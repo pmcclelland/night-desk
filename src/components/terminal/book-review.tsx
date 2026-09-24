@@ -10,13 +10,23 @@ import { money, pct, px, qty, signClass, signedMoney } from "@/lib/format";
 import { isTypingTarget } from "@/lib/keys";
 import { selectSymbol } from "@/lib/desk-sync";
 import { BookCurvePanel } from "@/components/terminal/book-curve";
+import { BookJournal } from "@/components/terminal/book-journal";
 import {
   nextCurveRange,
   reconstructSimCurve,
   toBookCurveSnapshot,
   type BookCurveSnapshot,
 } from "@/lib/book-curve";
-import { fetchOwnerBookCurve, listTheses, putThesis } from "@/lib/server/desk-api";
+import {
+  attachJournalThesis,
+  buildRoundTrips,
+  capJournal,
+  clipJournal,
+  fillsFromOrders,
+  type JournalFill,
+  type JournalRow,
+} from "@/lib/book-journal";
+import { fetchOwnerBookCurve, fetchOwnerJournalFills, listTheses, putThesis } from "@/lib/server/desk-api";
 import { fetchPublicCurveSeries } from "@/lib/server/market";
 import { fetchBrainSignals } from "@/lib/server/trader-signals";
 import { disconnectedSignals, SIGNALS_NOT_CONNECTED, type SignalsSnapshot } from "@/lib/signals";
@@ -65,7 +75,7 @@ function formFromThesis(thesis: BookThesis | null): ThesisForm {
 
 export function BookReview() {
   const navigate = useNavigate();
-  const { account, positions } = useLiveBook();
+  const { account, positions, orders } = useLiveBook();
   const venue = useDesk(selectVenue);
   const guest = useDesk((s) => s.guestDemo);
   const liveFeed = useDesk(selectLiveFeed);
@@ -78,6 +88,8 @@ export function BookReview() {
   const [curveRange, setCurveRange] = useState<CurveRange>("1M");
   const [curve, setCurve] = useState<BookCurveSnapshot | null>(null);
   const [curveLoading, setCurveLoading] = useState(true);
+  const [journalFills, setJournalFills] = useState<JournalFill[]>([]);
+  const [journalLoading, setJournalLoading] = useState(true);
 
   const view = useMemo(
     () =>
@@ -92,10 +104,15 @@ export function BookReview() {
     [venue, guest, liveFeed, account, positions, theses],
   );
 
-  const symbols = view.positions.map((p) => p.symbol);
+  const symbols = useMemo(() => view.positions.map((p) => p.symbol), [view.positions]);
   const tickerKey = symbols.join(",");
   const lotKey = view.positions.map((p) => `${p.symbol}:${p.qty}`).join(",");
   const useAlpacaCurve = !guest && venue !== "sim";
+  const simJournal = guest || venue === "sim";
+  const orderKey = orders
+    .filter((o) => o.status === "filled" || o.status === "partially_filled")
+    .map((o) => o.id)
+    .join(",");
   const [cursor, setCursor] = useState(() => selected);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [form, setForm] = useState<ThesisForm>(EMPTY_FORM);
@@ -143,11 +160,6 @@ export function BookReview() {
   }, [tickerKey]);
 
   useEffect(() => {
-    if (symbols.includes(selected)) setCursor(selected);
-    else if (symbols[0] && !symbols.includes(cursor)) setCursor(symbols[0]);
-  }, [selected, symbols, cursor]);
-
-  useEffect(() => {
     let live = true;
     setCurveLoading(true);
     const lots = view.positions.map((p) => ({ symbol: p.symbol, qty: p.qty }));
@@ -190,12 +202,57 @@ export function BookReview() {
   }, [curveRange, useAlpacaCurve, lotKey]);
 
   useEffect(() => {
+    let live = true;
+    setJournalLoading(true);
+    const run = useAlpacaCurve
+      ? fetchOwnerJournalFills({ data: { range: curveRange } }).then((raw) => raw.fills)
+      : Promise.resolve(fillsFromOrders(orders));
+    void run
+      .then((fills) => {
+        if (live) setJournalFills(fills);
+      })
+      .catch(() => {
+        if (live) setJournalFills([]);
+      })
+      .finally(() => {
+        if (live) setJournalLoading(false);
+      });
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- orders snapshotted via orderKey
+  }, [curveRange, useAlpacaCurve, orderKey]);
+
+  const journalRows: JournalRow[] = useMemo(
+    () =>
+      attachJournalThesis(capJournal(clipJournal(buildRoundTrips(journalFills), curveRange)), theses),
+    [journalFills, curveRange, theses],
+  );
+  const journalNav = useMemo(() => journalRows.map((row) => `jr:${row.id}`), [journalRows]);
+  const navKeys = useMemo(() => [...symbols, ...journalNav], [symbols, journalNav]);
+
+  useEffect(() => {
+    if (cursor.startsWith("jr:")) {
+      if (!navKeys.includes(cursor)) setCursor(symbols[0] ?? journalNav[0] ?? selected);
+      return;
+    }
+    if (symbols.includes(selected)) setCursor(selected);
+    else if (symbols[0] && !symbols.includes(cursor)) setCursor(symbols[0]);
+  }, [selected, symbols, cursor, navKeys, journalNav]);
+
+  useEffect(() => {
     if (!expanded) return;
     setForm(formFromThesis(theses[expanded] ?? null));
     rowRefs.current[expanded]?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, [expanded, theses]);
 
   useEffect(() => {
+    function journalSymbol(key: string) {
+      if (!key.startsWith("jr:")) return null;
+      const id = key.slice(3);
+      return journalRows.find((row) => row.id === id)?.symbol ?? null;
+    }
+
     function onKey(e: KeyboardEvent) {
       if (isTypingTarget(e.target)) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -212,6 +269,7 @@ export function BookReview() {
       }
 
       if (e.key === "Enter") {
+        if (!cursor || cursor.startsWith("jr:") || !symbols.includes(cursor)) return;
         e.preventDefault();
         setExpanded((cur) => (cur === cursor ? null : cursor));
         return;
@@ -219,8 +277,9 @@ export function BookReview() {
 
       if (e.key === "g" || e.key === "G") {
         e.preventDefault();
-        if (cursor) {
-          selectSymbol(cursor);
+        const symbol = cursor.startsWith("jr:") ? journalSymbol(cursor) : cursor;
+        if (symbol) {
+          selectSymbol(symbol);
           void navigate({ to: "/" });
         }
         return;
@@ -236,15 +295,15 @@ export function BookReview() {
       const up = e.key === "k" || e.key === "K" || e.key === "ArrowUp";
       if (!down && !up) return;
       e.preventDefault();
-      const i = Math.max(0, symbols.indexOf(cursor));
-      const next = symbols[down ? Math.min(symbols.length - 1, i + 1) : Math.max(0, i - 1)];
+      const i = Math.max(0, navKeys.indexOf(cursor));
+      const next = navKeys[down ? Math.min(navKeys.length - 1, i + 1) : Math.max(0, i - 1)];
       if (!next) return;
       setCursor(next);
-      selectSymbol(next);
+      if (symbols.includes(next)) selectSymbol(next);
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [cursor, expanded, navigate, symbols]);
+  }, [cursor, expanded, journalRows, navKeys, navigate, symbols]);
 
   async function saveExpanded() {
     if (!expanded) return;
@@ -421,6 +480,16 @@ export function BookReview() {
           </table>
         </div>
       )}
+      <BookJournal
+        rows={journalRows}
+        loading={journalLoading}
+        sim={simJournal}
+        cursor={cursor}
+        onPick={(id, symbol) => {
+          setCursor(`jr:${id}`);
+          selectSymbol(symbol);
+        }}
+      />
       <p className="shrink-0 border-t border-border px-3 py-2 font-mono text-micro tracking-widest text-subtle uppercase">
         j k move · enter thesis · r range · g trade · p desk
       </p>

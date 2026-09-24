@@ -62,12 +62,12 @@ Anything that is not a command is sent to Grok as a terse desk copilot. **Thesis
 | `Shift+F` | Fullscreen the desk |
 | `Esc` | Exit focus or fullscreen |
 | `/` | Focus the bot |
-| Review: `j`/`k` or arrows | Move between names |
+| Review: `j`/`k` or arrows | Move between names and the journal |
 | Review: `Enter` | Expand / collapse thesis |
 | Review: `r` | Cycle curve range (1W / 1M / 3M) |
 | Review: `G` | Open that name on the trade desk |
 
-On `/review`, type a thesis on a name and Save. Owner rows go to `desk_kv` (`ns=thesis`). Guest mode keeps them in this browser only and never writes the desk. The chart **Thesis** button is still the SMA/RSI one-liner, not the book thesis. Brain signals are read-only from the trader project; if that feed is unset, the panel says `signals not connected`. The book curve is 1W / 1M / 3M vs SPY (`r` cycles). Guest / SIM builds it from Yahoo closes and labels it SIM; the signed-in owner book uses Alpaca portfolio history.
+On `/review`, type a thesis on a name and Save. Owner rows go to `desk_kv` (`ns=thesis`). Guest mode keeps them in this browser only and never writes the desk. The chart **Thesis** button is still the SMA/RSI one-liner, not the book thesis. Brain signals are read-only from the trader project; if that feed is unset, the panel says `signals not connected`. The book curve is 1W / 1M / 3M vs SPY (`r` cycles). Guest / SIM builds it from Yahoo closes and labels it SIM; the signed-in owner book uses Alpaca portfolio history. The journal lists closed round-trips (FIFO) for the selected curve window. Guest / SIM derives them from the SIM book and never calls Alpaca; the owner book uses Alpaca fill activities.
 
 ## Stack
 
