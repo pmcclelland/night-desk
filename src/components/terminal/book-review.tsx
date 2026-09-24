@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import {
   formatThesisAge,
@@ -66,7 +66,6 @@ export function BookReview() {
     status: "loading",
   });
   const [saving, setSaving] = useState(false);
-  const signalKeyRef = useRef("");
 
   const view = useMemo(
     () =>
@@ -106,19 +105,25 @@ export function BookReview() {
   }, [guest]);
 
   useEffect(() => {
-    if (signalKeyRef.current === tickerKey) return;
-    signalKeyRef.current = tickerKey;
     const tickers = tickerKey ? tickerKey.split(",") : [];
     let live = true;
+    const fallback = window.setTimeout(() => {
+      if (live) setSignals(disconnectedSignals());
+    }, 4000);
     void fetchBrainSignals({ data: { tickers } })
       .then((snap) => {
-        if (live) setSignals(snap);
+        if (!live) return;
+        window.clearTimeout(fallback);
+        setSignals(snap);
       })
       .catch(() => {
-        if (live) setSignals(disconnectedSignals());
+        if (!live) return;
+        window.clearTimeout(fallback);
+        setSignals(disconnectedSignals());
       });
     return () => {
       live = false;
+      window.clearTimeout(fallback);
     };
   }, [tickerKey]);
 
@@ -331,6 +336,9 @@ export function BookReview() {
           ) : null}
         </div>
       )}
+      <p className="shrink-0 border-t border-border px-3 py-2 font-mono text-micro tracking-widest text-subtle uppercase">
+        j k move · enter thesis · g trade · p desk
+      </p>
     </div>
   );
 }
