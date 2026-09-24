@@ -124,7 +124,10 @@ function CurveSvg({ book, spy }: { book: EquityPoint[]; spy: EquityPoint[] }) {
       }
       return segs.join(" ");
     };
-    const ticks = niceTicks(min, max, 4).filter((t) => t >= min && t <= max);
+    const ticks = niceTicks(min, max, 5).filter((t) => {
+      const y = yAt(t);
+      return y >= padT - 4 && y <= padT + plotH + 4;
+    });
     return {
       w,
       h,
@@ -169,6 +172,7 @@ function CurveSvg({ book, spy }: { book: EquityPoint[]; spy: EquityPoint[] }) {
           {layout.ticks.map((t) => {
             const y = layout.yAt(t);
             const isTop = t === Math.max(...layout.ticks);
+            const labelY = isTop ? Math.max(10, y - 3) : y;
             return (
               <g key={t}>
                 <line
@@ -181,7 +185,7 @@ function CurveSvg({ book, spy }: { book: EquityPoint[]; spy: EquityPoint[] }) {
                 />
                 <text
                   x={layout.w - 6}
-                  y={isTop ? y - 2 : y}
+                  y={labelY}
                   textAnchor="end"
                   dominantBaseline={isTop ? "auto" : "middle"}
                   className="fill-subtle font-mono tabular-nums"
