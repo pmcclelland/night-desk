@@ -50,7 +50,7 @@ export function BookConcentration({
         <ConcStat label="Top 5" value={formatSharePct(snap.top5SharePct)} />
         <ConcStat label="Cash" value={formatSharePct(snap.cashPct)} />
       </div>
-      <p className="mt-2 min-w-0 truncate font-mono text-2xs text-muted">{names || "—"}</p>
+      <p className="mt-2 min-w-0 truncate font-mono text-2xs text-subtle">{names || "—"}</p>
       {snap.sectors.length > 0 ? (
         <div className="mt-2">
           {snap.sectors.map((row) => (
