@@ -133,8 +133,8 @@ describe("book-journal FIFO", () => {
   it("clips to exits inside the curve window", () => {
     const now = Date.parse("2026-09-24T18:00:00.000Z");
     const trips = buildRoundTrips([
-      fill({ id: "b", side: "buy", qty: 1, price: 10, t: Date.parse("2026-06-01T00:00:00.000Z") }),
-      fill({ id: "s", side: "sell", qty: 1, price: 12, t: Date.parse("2026-06-10T00:00:00.000Z") }),
+      fill({ id: "b", side: "buy", qty: 1, price: 10, t: Date.parse("2026-07-01T00:00:00.000Z") }),
+      fill({ id: "s", side: "sell", qty: 1, price: 12, t: Date.parse("2026-07-10T00:00:00.000Z") }),
       fill({ id: "b2", side: "buy", qty: 1, price: 10, t: Date.parse("2026-09-01T00:00:00.000Z") }),
       fill({ id: "s2", side: "sell", qty: 1, price: 11, t: Date.parse("2026-09-20T00:00:00.000Z") }),
     ]);
