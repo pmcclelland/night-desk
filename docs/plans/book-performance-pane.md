@@ -188,4 +188,3 @@ Approved remaining panels, in order. Not in slice 2.
 4. **Trade journal** — closed positions: hold time, realized P&L, thesis at exit.
 5. **Concentration** — top-5 share, sector split, cash %.
 6. **Upcoming catalysts** — earnings + ex-div next 2 weeks; dividends from Alpaca; earnings need a source.
-
