@@ -66,6 +66,8 @@ Anything that is not a command is sent to Grok as a terse desk copilot. **Thesis
 | Review: `Enter` | Expand / collapse thesis |
 | Review: `G` | Open that name on the trade desk |
 
+On `/review`, type a thesis on a name and Save. Owner rows go to `desk_kv` (`ns=thesis`). Guest mode keeps them in this browser only and never writes the desk. The chart **Thesis** button is still the SMA/RSI one-liner, not the book thesis. Brain signals are read-only from the trader project; if that feed is unset, the panel says `signals not connected`.
+
 ## Stack
 
 - [React 19](https://react.dev/) + [TanStack Start](https://tanstack.com/start) / Router
