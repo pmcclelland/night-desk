@@ -1,5 +1,11 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type MouseEvent, type TouchEvent } from "react";
-import { CURVE_RANGES, formatCurveAxis, type BookCurveSnapshot } from "@/lib/book-curve";
+import {
+  CURVE_RANGES,
+  curvePlotScale,
+  layoutCurveTimeLabels,
+  formatCurveAxis,
+  type BookCurveSnapshot,
+} from "@/lib/book-curve";
 import { barTime, money, pct, signClass } from "@/lib/format";
 import type { CurveRange, EquityPoint } from "@/lib/types";
 import { cn } from "@/lib/cn";
@@ -110,9 +116,7 @@ function CurveSvg({ book, spy }: { book: EquityPoint[]; spy: EquityPoint[] }) {
     const values = [...book.map((p) => p.v), ...spy.map((p) => p.v)].filter((n) => Number.isFinite(n));
     const hi = Math.max(...values);
     const lo = Math.min(...values);
-    const span = (Number.isFinite(hi) && Number.isFinite(lo) ? hi - lo : 0) || 1;
-    const min = lo - span * 0.08;
-    const max = hi + span * 0.08;
+    const { min, max, ticks } = curvePlotScale(lo, hi);
     const xAt = (i: number, n: number) => padL + ((i + 0.5) / n) * plotW;
     const yAt = (p: number) => padT + ((max - p) / (max - min)) * plotH;
     const pathThrough = (pts: EquityPoint[]) => {
@@ -124,10 +128,7 @@ function CurveSvg({ book, spy }: { book: EquityPoint[]; spy: EquityPoint[] }) {
       }
       return segs.join(" ");
     };
-    const ticks = niceTicks(min, max, 5).filter((t) => {
-      const y = yAt(t);
-      return y >= padT - 4 && y <= padT + plotH + 4;
-    });
+    const timeStep = Math.max(1, Math.floor(book.length / 5));
     return {
       w,
       h,
@@ -144,7 +145,8 @@ function CurveSvg({ book, spy }: { book: EquityPoint[]; spy: EquityPoint[] }) {
       bookPath: pathThrough(book),
       spyPath: pathThrough(spy),
       n: book.length,
-      timeStep: Math.max(1, Math.floor(book.length / 5)),
+      timeStep,
+      labeled: book.map((_, i) => i).filter((i) => i % timeStep === 0),
     };
   }, [book, spy, size]);
 
@@ -210,20 +212,27 @@ function CurveSvg({ book, spy }: { book: EquityPoint[]; spy: EquityPoint[] }) {
             strokeLinejoin="round"
             strokeLinecap="round"
           />
-          {book.map((p, i) =>
-            i % layout.timeStep === 0 ? (
-              <text
-                key={`t-${p.t}`}
-                x={layout.xAt(i, layout.n)}
-                y={layout.h - 6}
-                textAnchor="middle"
-                className="fill-subtle font-mono"
-                fontSize="10"
-              >
-                {barTime(p.t, false)}
-              </text>
-            ) : null,
-          )}
+          {layoutCurveTimeLabels(
+            layout.labeled.map((i) => ({
+              i,
+              x: layout.xAt(i, layout.n),
+              text: barTime(book[i]!.t, false),
+            })),
+            layout.padL,
+            layout.plotW,
+            layout.w,
+          ).map((place) => (
+            <text
+              key={`t-${book[place.i]!.t}`}
+              x={place.x}
+              y={layout.h - 6}
+              textAnchor={place.anchor}
+              className="fill-subtle font-mono"
+              fontSize="10"
+            >
+              {place.text}
+            </text>
+          ))}
           {hover !== null && book[hover] ? (
             <>
               <line
@@ -247,31 +256,6 @@ function CurveSvg({ book, spy }: { book: EquityPoint[]; spy: EquityPoint[] }) {
       ) : null}
     </div>
   );
-}
-
-function niceNum(range: number, round: boolean) {
-  const exp = Math.floor(Math.log10(range));
-  const f = range / 10 ** exp;
-  let nf: number;
-  if (round) {
-    if (f < 1.5) nf = 1;
-    else if (f < 3) nf = 2;
-    else if (f < 7) nf = 5;
-    else nf = 10;
-  } else if (f <= 1) nf = 1;
-  else if (f <= 2) nf = 2;
-  else if (f <= 5) nf = 5;
-  else nf = 10;
-  return nf * 10 ** exp;
-}
-
-function niceTicks(min: number, max: number, count = 4) {
-  const range = niceNum(max - min || 1, false);
-  const step = niceNum(range / (count - 1), true);
-  const start = Math.floor(min / step) * step;
-  const out: number[] = [];
-  for (let v = start; v <= max + step / 2; v += step) out.push(v);
-  return out;
 }
 
 function HoverLabel({ x, maxW, padL, text }: { x: number; maxW: number; padL: number; text: string }) {

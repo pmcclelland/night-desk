@@ -5,6 +5,9 @@ import {
   clipEquityForCurve,
   curveWindow,
   nextCurveRange,
+  curvePlotScale,
+  curveTimeLabelPlacement,
+  layoutCurveTimeLabels,
   formatCurveAxis,
   rebaseToStart,
   reconstructSimCurve,
@@ -118,6 +121,61 @@ describe("book-curve", () => {
   it("seriesReturn is null on an empty or zero start", () => {
     assert.equal(seriesReturn([]), null);
     assert.equal(seriesReturn([pt("2026-09-22", 0), pt("2026-09-23", 10)]), null);
+  });
+
+  it("pins first and last x labels to the plot edges only when the plot is narrow", () => {
+    const labeled = [0, 4, 8, 12];
+    const wide = curveTimeLabelPlacement(0, labeled, 20, 8, 200, 800);
+    assert.equal(wide.anchor, "middle");
+    assert.equal(wide.x, 20);
+    const first = curveTimeLabelPlacement(0, labeled, 20, 8, 200, 390);
+    assert.equal(first.anchor, "start");
+    assert.equal(first.x, 8);
+    const last = curveTimeLabelPlacement(12, labeled, 190, 8, 200, 390);
+    assert.equal(last.anchor, "end");
+    assert.equal(last.x, 208);
+    const mid = curveTimeLabelPlacement(4, labeled, 80, 8, 200, 390);
+    assert.equal(mid.anchor, "middle");
+    assert.equal(mid.x, 80);
+  });
+
+  it("drops a narrow interior x label that crowds a pinned edge", () => {
+    const ticks = [
+      { i: 0, x: 20, text: "Aug 25" },
+      { i: 4, x: 48, text: "Aug 31" },
+      { i: 8, x: 120, text: "Sep 11" },
+      { i: 12, x: 190, text: "Sep 23" },
+    ];
+    const wide = layoutCurveTimeLabels(ticks, 8, 200, 800);
+    assert.equal(wide.length, 4);
+    assert.ok(wide.every((l) => l.anchor === "middle"));
+    const narrow = layoutCurveTimeLabels(ticks, 8, 200, 390);
+    assert.equal(narrow[0]?.text, "Aug 25");
+    assert.equal(narrow[0]?.anchor, "start");
+    assert.equal(narrow[narrow.length - 1]?.text, "Sep 23");
+    assert.equal(narrow[narrow.length - 1]?.anchor, "end");
+    assert.equal(narrow.some((l) => l.text === "Aug 31"), false);
+    assert.equal(narrow.some((l) => l.text === "Sep 11"), true);
+  });
+
+  it("drops a narrow interior x label that crowds the last pinned edge", () => {
+    const ticks = [
+      { i: 0, x: 20, text: "Aug 25" },
+      { i: 8, x: 120, text: "Sep 11" },
+      { i: 12, x: 175, text: "Sep 17" },
+      { i: 16, x: 190, text: "Sep 23" },
+    ];
+    const narrow = layoutCurveTimeLabels(ticks, 8, 200, 390);
+    assert.equal(narrow.some((l) => l.text === "Sep 17"), false);
+    assert.equal(narrow[narrow.length - 1]?.text, "Sep 23");
+  });
+
+  it("pads the plot after nicing so the series floor is not a gridline", () => {
+    const { min, max, ticks } = curvePlotScale(103_000, 104_500);
+    assert.ok(min < 103_000);
+    assert.ok(max > 104_500);
+    assert.equal(ticks.includes(103_000), false);
+    assert.ok(ticks.some((t) => t > 103_000));
   });
 
   it("formats axis labels with grouping on both large and small values", () => {

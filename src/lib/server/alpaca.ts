@@ -1,3 +1,5 @@
+import { rfc3339 } from "@/lib/bar-window";
+import type { JournalFill } from "@/lib/book-journal";
 import type { Account, Creds, CurveRange, EquityPoint, Order, Position, Venue } from "@/lib/types";
 
 function host(venue: Venue) {
@@ -262,4 +264,68 @@ export async function fetchEquityHistoryInner(
   } catch {
     return [];
   }
+}
+
+interface AlpacaFill {
+  id?: string;
+  activity_type?: string;
+  transaction_time?: string;
+  symbol?: string;
+  side?: string;
+  qty?: string | number;
+  price?: string | number;
+  order_id?: string;
+}
+
+export async function fetchAccountFillsInner(
+  venue: Venue,
+  creds: Creds,
+  afterMs: number,
+  untilMs = Date.now(),
+): Promise<JournalFill[]> {
+  const out: JournalFill[] = [];
+  let page: string | undefined;
+  try {
+    for (let i = 0; i < 8; i++) {
+      const params = new URLSearchParams({
+        after: rfc3339(new Date(afterMs)),
+        until: rfc3339(new Date(untilMs)),
+        page_size: "100",
+        direction: "asc",
+      });
+      if (page) params.set("page_token", page);
+      const res = await fetch(
+        `${host(venue)}/v2/account/activities/FILL?${params}`,
+        { headers: headers(creds) },
+      );
+      const text = await res.text();
+      if (!res.ok) break;
+      const body = text ? (JSON.parse(text) as AlpacaFill[] | { activities?: AlpacaFill[] }) : [];
+      const rows = Array.isArray(body) ? body : (body.activities ?? []);
+      for (const row of rows) {
+        const symbol = row.symbol?.toUpperCase();
+        const side = row.side === "buy" || row.side === "sell" ? row.side : null;
+        const qty = Number(row.qty);
+        const price = Number(row.price);
+        const t = row.transaction_time ? Date.parse(row.transaction_time) : NaN;
+        if (!symbol || !side || !Number.isFinite(qty) || qty <= 0 || !Number.isFinite(price) || !Number.isFinite(t)) {
+          continue;
+        }
+        out.push({
+          id: row.id || row.order_id || `${symbol}:${t}:${out.length}`,
+          symbol,
+          side,
+          qty,
+          price,
+          t,
+        });
+      }
+      const next = res.headers.get("next-page-token") || res.headers.get("Next-Page-Token");
+      if (!next || rows.length === 0) break;
+      page = next;
+    }
+  } catch {
+    return out;
+  }
+  return out.sort((a, b) => a.t - b.t || a.id.localeCompare(b.id));
 }

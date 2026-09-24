@@ -6,7 +6,8 @@ import { executeDeskOp, type DeskOp } from "@/lib/server/desk-engine";
 import { captureAlpacaBook } from "@/lib/server/desk-ledger";
 import { deleteDeskKv, getDeskKv, listDeskKv, putDeskKv } from "@/lib/server/desk-kv";
 import { claimOwner, loadDesk, publicDesk, requireOwner, type DeskSnapshot } from "@/lib/server/desk-store";
-import { fetchEquityHistoryInner } from "@/lib/server/alpaca";
+import { fetchAccountFillsInner, fetchEquityHistoryInner } from "@/lib/server/alpaca";
+import type { JournalFill } from "@/lib/book-journal";
 import { loadCurveBars } from "@/lib/server/market";
 import type { CurveRange, EquityPoint } from "@/lib/types";
 import { createMcpToken, listMcpTokens, revokeMcpToken } from "@/lib/server/mcp-token.server";
@@ -138,4 +139,20 @@ export const fetchOwnerBookCurve = createServerFn({ method: "POST" })
       creds,
     });
     return { book, spy: barsToPoints(spyBars.bars), usedAlpaca: true };
+  });
+
+const FILL_LOOKBACK_MS = 400 * 86_400_000;
+
+export const fetchOwnerJournalFills = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: { range: CurveRange }) => input)
+  .handler(async ({ context }) => {
+    await requireOwner(context.userId);
+    const desk = await loadDesk(context.userId);
+    const creds = desk.creds;
+    if (desk.venue === "sim" || !creds?.keyId || !creds.secret) {
+      return { fills: [] as JournalFill[], usedAlpaca: false };
+    }
+    const fills = await fetchAccountFillsInner(desk.venue, creds, Date.now() - FILL_LOOKBACK_MS);
+    return { fills, usedAlpaca: true };
   });

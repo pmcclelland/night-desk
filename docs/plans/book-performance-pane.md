@@ -184,7 +184,7 @@ Paul approved all eight defaults.
 
 Approved remaining panels, in order.
 
-3. **Equity curve vs SPY** — **in progress.** 1W / 1M / 3M on `/review`. Owner Alpaca: `fetchOwnerBookCurve` → portfolio history (`period` + `timeframe=1D`), SPY from the same bars path as the tape. Guest / SIM: reconstruct cash + qty × Yahoo daily closes (never Alpaca), labeled SIM. SPY rebased to the book start; total return vs SPY for the selected range. Fetch once per range change, no polling. `r` cycles the range.
-4. **Trade journal** — closed positions: hold time, realized P&L, thesis at exit.
+3. **Equity curve vs SPY** — 1W / 1M / 3M on `/review`. Owner Alpaca: `fetchOwnerBookCurve` → portfolio history (`period` + `timeframe=1D`), SPY from the same bars path as the tape. Guest / SIM: reconstruct cash + qty × Yahoo daily closes (never Alpaca), labeled SIM. SPY rebased to the book start; total return vs SPY for the selected range. Fetch once per range change, no polling. `r` cycles the range.
+4. **Trade journal** — **in progress.** Closed positions on `/review`: symbol, side, entry/exit date+price, hold time, realized P&L ($ and %), thesis at exit (conviction + one-line snippet, or a dim dash). Newest first, cap 40. `j`/`k` walk positions then journal; `G` on a journal row opens that symbol on `/`. Owner: FIFO lots from Alpaca FILL activities (400d lookback, client clips to the curve window), fetch once on open or range change. Guest / SIM: `fillsFromOrders` on the SIM book (never Alpaca), labeled SIM.
 5. **Concentration** — top-5 share, sector split, cash %.
 6. **Upcoming catalysts** — earnings + ex-div next 2 weeks; dividends from Alpaca; earnings need a source.
