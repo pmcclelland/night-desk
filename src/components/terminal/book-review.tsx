@@ -9,9 +9,18 @@ import {
 import { money, pct, px, qty, signClass, signedMoney } from "@/lib/format";
 import { isTypingTarget } from "@/lib/keys";
 import { selectSymbol } from "@/lib/desk-sync";
-import { listTheses, putThesis } from "@/lib/server/desk-api";
+import { BookCurvePanel } from "@/components/terminal/book-curve";
+import {
+  nextCurveRange,
+  reconstructSimCurve,
+  toBookCurveSnapshot,
+  type BookCurveSnapshot,
+} from "@/lib/book-curve";
+import { fetchOwnerBookCurve, listTheses, putThesis } from "@/lib/server/desk-api";
+import { fetchPublicCurveSeries } from "@/lib/server/market";
 import { fetchBrainSignals } from "@/lib/server/trader-signals";
 import { disconnectedSignals, SIGNALS_NOT_CONNECTED, type SignalsSnapshot } from "@/lib/signals";
+import type { CurveRange } from "@/lib/types";
 import {
   loadGuestTheses,
   mergeThesisWrite,
@@ -66,6 +75,9 @@ export function BookReview() {
     status: "loading",
   });
   const [saving, setSaving] = useState(false);
+  const [curveRange, setCurveRange] = useState<CurveRange>("1M");
+  const [curve, setCurve] = useState<BookCurveSnapshot | null>(null);
+  const [curveLoading, setCurveLoading] = useState(true);
 
   const view = useMemo(
     () =>
@@ -82,6 +94,8 @@ export function BookReview() {
 
   const symbols = view.positions.map((p) => p.symbol);
   const tickerKey = symbols.join(",");
+  const lotKey = view.positions.map((p) => `${p.symbol}:${p.qty}`).join(",");
+  const useAlpacaCurve = !guest && venue !== "sim";
   const [cursor, setCursor] = useState(() => selected);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [form, setForm] = useState<ThesisForm>(EMPTY_FORM);
@@ -134,6 +148,48 @@ export function BookReview() {
   }, [selected, symbols, cursor]);
 
   useEffect(() => {
+    let live = true;
+    setCurveLoading(true);
+    const lots = view.positions.map((p) => ({ symbol: p.symbol, qty: p.qty }));
+    const cash = view.cash;
+    const run = useAlpacaCurve
+      ? fetchOwnerBookCurve({ data: { range: curveRange } }).then((raw) =>
+          toBookCurveSnapshot({
+            range: curveRange,
+            label: "alpaca",
+            book: raw.book,
+            spy: raw.spy,
+          }),
+        )
+      : fetchPublicCurveSeries({
+          data: { symbols: [...lots.map((l) => l.symbol), "SPY"], range: curveRange },
+        }).then((raw) => {
+          const book = reconstructSimCurve(lots, raw.series, cash);
+          return toBookCurveSnapshot({
+            range: curveRange,
+            label: "sim",
+            book,
+            spy: (raw.series.SPY ?? []).map((b) => ({ t: b.t, v: b.c })),
+          });
+        });
+    void run
+      .then((snap) => {
+        if (live) setCurve(snap);
+      })
+      .catch(() => {
+        if (live) setCurve(null);
+      })
+      .finally(() => {
+        if (live) setCurveLoading(false);
+      });
+    return () => {
+      live = false;
+    };
+    // Lots + range only — do not refetch on every LIVE mark.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- cash/view snapshot at fetch time
+  }, [curveRange, useAlpacaCurve, lotKey]);
+
+  useEffect(() => {
     if (!expanded) return;
     setForm(formFromThesis(theses[expanded] ?? null));
     rowRefs.current[expanded]?.scrollIntoView({ block: "nearest", inline: "nearest" });
@@ -167,6 +223,12 @@ export function BookReview() {
           selectSymbol(cursor);
           void navigate({ to: "/" });
         }
+        return;
+      }
+
+      if (e.key === "r" || e.key === "R") {
+        e.preventDefault();
+        setCurveRange((cur) => nextCurveRange(cur));
         return;
       }
 
@@ -235,6 +297,8 @@ export function BookReview() {
           <Stat label="Cash" value={money(view.cash, true)} />
         </div>
       </section>
+
+      <BookCurvePanel range={curveRange} onRange={setCurveRange} snap={curve} loading={curveLoading} />
 
       <SignalsPanel symbols={symbols} signals={signals} />
 
@@ -358,7 +422,7 @@ export function BookReview() {
         </div>
       )}
       <p className="shrink-0 border-t border-border px-3 py-2 font-mono text-micro tracking-widest text-subtle uppercase">
-        j k move · enter thesis · g trade · p desk
+        j k move · enter thesis · r range · g trade · p desk
       </p>
     </div>
   );
@@ -382,35 +446,44 @@ function SignalsPanel({
           </p>
         </section>
       );
-    case "connected":
+    case "connected": {
+      const named = symbols.filter((sym) => signals.byTicker[sym]);
+      const quiet = symbols.length - named.length;
       return (
         <section className="shrink-0 border-b border-border bg-surface px-3 py-2">
           <p className="font-mono text-micro tracking-widest text-accent uppercase">Brain</p>
           {symbols.length === 0 ? (
             <p className="mt-2 font-mono text-2xs text-subtle">No held names</p>
           ) : (
-            <ul className="mt-2 grid gap-x-4 gap-y-1 sm:grid-cols-2">
-              {symbols.map((sym) => {
-                const row = signals.byTicker[sym];
-                return (
-                  <li key={sym} className="min-w-0 truncate font-mono text-2xs">
-                    <span className="text-fg">{sym}</span>
-                    {row ? (
-                      <span className="text-muted">
-                        {" "}
-                        {row.direction ?? "—"} · {row.convictionLabel ?? "—"}
-                        {row.thesisSummary ? ` · ${row.thesisSummary}` : ""}
-                      </span>
-                    ) : (
-                      <span className="text-subtle"> —</span>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
+            <>
+              {named.length > 0 ? (
+                <ul className="mt-2 space-y-1">
+                  {named.map((sym) => {
+                    const row = signals.byTicker[sym];
+                    if (!row) return null;
+                    return (
+                      <li key={sym} className="min-w-0 truncate font-mono text-2xs">
+                        <span className="text-fg">{sym}</span>
+                        <span className="text-muted">
+                          {" "}
+                          {row.direction ?? "—"} · {row.convictionLabel ?? "—"}
+                          {row.thesisSummary ? ` · ${row.thesisSummary}` : ""}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : null}
+              {quiet > 0 ? (
+                <p className="mt-1 font-mono text-2xs text-subtle">
+                  {quiet} quiet
+                </p>
+              ) : null}
+            </>
           )}
         </section>
       );
+    }
     default: {
       const _exhaustive: never = signals;
       void _exhaustive;
@@ -439,8 +512,23 @@ function ThesisEditor({
   const health = row.health;
   return (
     <div className="border-t border-border bg-surface px-3 py-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <p className="font-mono text-micro tracking-widest text-accent uppercase">{row.symbol}</p>
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <div className="flex flex-wrap gap-x-4 gap-y-1 font-mono text-2xs">
+          <HealthStat
+            label="Age"
+            value={health ? formatThesisAge(health.ageDays) : "—"}
+            warn={health?.stale}
+          />
+          <HealthStat
+            label="Since written"
+            value={health?.movePct != null ? pct(health.movePct) : "—"}
+            valueClass={health?.movePct != null ? signClass(health.movePct) : undefined}
+          />
+          <HealthStat label="Stale" value={health?.stale ? "30d+" : "No"} warn={health?.stale} />
+          {row.thesis?.writtenPrice != null ? (
+            <HealthStat label="Written" value={px(row.thesis.writtenPrice)} />
+          ) : null}
+        </div>
         <button
           type="button"
           onClick={onClose}
@@ -448,23 +536,6 @@ function ThesisEditor({
         >
           Close
         </button>
-      </div>
-
-      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-mono text-2xs">
-        <HealthStat
-          label="Age"
-          value={health ? formatThesisAge(health.ageDays) : "—"}
-          warn={health?.stale}
-        />
-        <HealthStat
-          label="Since written"
-          value={health?.movePct != null ? pct(health.movePct) : "—"}
-          valueClass={health?.movePct != null ? signClass(health.movePct) : undefined}
-        />
-        <HealthStat label="Stale" value={health?.stale ? "30d+" : "No"} warn={health?.stale} />
-        {row.thesis?.writtenPrice != null ? (
-          <HealthStat label="Written" value={px(row.thesis.writtenPrice)} />
-        ) : null}
       </div>
 
       {guest ? (

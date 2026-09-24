@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import type { Creds, EquityPoint, Venue } from "@/lib/types";
+import type { Creds, CurveRange, EquityPoint, Venue } from "@/lib/types";
 import {
   cancelAllAlpacaInner,
   cancelAlpacaOrderInner,
@@ -52,5 +52,7 @@ export const closeAllAlpaca = createServerFn({ method: "POST" })
   .handler(async ({ data }) => closeAllAlpacaInner(data.venue, data.creds));
 
 export const fetchEquityHistory = createServerFn({ method: "POST" })
-  .validator((input: { venue: Venue; creds: Creds }) => input)
-  .handler(async ({ data }): Promise<EquityPoint[]> => fetchEquityHistoryInner(data.venue, data.creds));
+  .validator((input: { venue: Venue; creds: Creds; period?: CurveRange }) => input)
+  .handler(async ({ data }): Promise<EquityPoint[]> =>
+    fetchEquityHistoryInner(data.venue, data.creds, data.period ?? "1M"),
+  );

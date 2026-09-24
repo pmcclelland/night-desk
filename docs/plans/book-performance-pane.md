@@ -182,9 +182,9 @@ Paul approved all eight defaults.
 
 ## Later slices
 
-Approved remaining panels, in order. Not in slice 2.
+Approved remaining panels, in order.
 
-3. **Equity curve vs SPY** — 1W / 1M / 3M, Alpaca portfolio history (`fetchEquityHistory` is already unused in `trade.ts`).
+3. **Equity curve vs SPY** — **in progress.** 1W / 1M / 3M on `/review`. Owner Alpaca: `fetchOwnerBookCurve` → portfolio history (`period` + `timeframe=1D`), SPY from the same bars path as the tape. Guest / SIM: reconstruct cash + qty × Yahoo daily closes (never Alpaca), labeled SIM. SPY rebased to the book start; total return vs SPY for the selected range. Fetch once per range change, no polling. `r` cycles the range.
 4. **Trade journal** — closed positions: hold time, realized P&L, thesis at exit.
 5. **Concentration** — top-5 share, sector split, cash %.
 6. **Upcoming catalysts** — earnings + ex-div next 2 weeks; dividends from Alpaca; earnings need a source.
