@@ -9,20 +9,31 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as DeskRouteImport } from './routes/_desk'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as DeskIndexRouteImport } from './routes/_desk/index'
+import { Route as DeskReviewRouteImport } from './routes/_desk/review'
 import { Route as ApiMcpRouteImport } from './routes/api/mcp'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const DeskRoute = DeskRouteImport.update({
+  id: '/_desk',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
   getParentRoute: () => rootRouteImport,
+} as any)
+const DeskIndexRoute = DeskIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => DeskRoute,
+} as any)
+const DeskReviewRoute = DeskReviewRouteImport.update({
+  id: '/review',
+  path: '/review',
+  getParentRoute: () => DeskRoute,
 } as any)
 const ApiMcpRoute = ApiMcpRouteImport.update({
   id: '/api/mcp',
@@ -36,34 +47,45 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
+  '/': typeof DeskIndexRoute
   '/login': typeof LoginRoute
+  '/review': typeof DeskReviewRoute
   '/api/mcp': typeof ApiMcpRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/review': typeof DeskReviewRoute
   '/api/mcp': typeof ApiMcpRoute
+  '/': typeof DeskIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
+  '/_desk': typeof DeskRouteWithChildren
   '/login': typeof LoginRoute
+  '/_desk/review': typeof DeskReviewRoute
   '/api/mcp': typeof ApiMcpRoute
+  '/_desk/': typeof DeskIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/api/mcp' | '/api/auth/$'
+  fullPaths: '/' | '/login' | '/review' | '/api/mcp' | '/api/auth/$'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/api/mcp' | '/api/auth/$'
-  id: '__root__' | '/' | '/login' | '/api/mcp' | '/api/auth/$'
+  to: '/login' | '/review' | '/api/mcp' | '/' | '/api/auth/$'
+  id:
+    | '__root__'
+    | '/_desk'
+    | '/login'
+    | '/_desk/review'
+    | '/api/mcp'
+    | '/_desk/'
+    | '/api/auth/$'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
+  DeskRoute: typeof DeskRouteWithChildren
   LoginRoute: typeof LoginRoute
   ApiMcpRoute: typeof ApiMcpRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
@@ -71,11 +93,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
+    '/_desk': {
+      id: '/_desk'
+      path: ''
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+      preLoaderRoute: typeof DeskRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -84,6 +106,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_desk/': {
+      id: '/_desk/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof DeskIndexRouteImport
+      parentRoute: typeof DeskRoute
+    }
+    '/_desk/review': {
+      id: '/_desk/review'
+      path: '/review'
+      fullPath: '/review'
+      preLoaderRoute: typeof DeskReviewRouteImport
+      parentRoute: typeof DeskRoute
     }
     '/api/mcp': {
       id: '/api/mcp'
@@ -102,8 +138,20 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface DeskRouteChildren {
+  DeskReviewRoute: typeof DeskReviewRoute
+  DeskIndexRoute: typeof DeskIndexRoute
+}
+
+const DeskRouteChildren: DeskRouteChildren = {
+  DeskReviewRoute: DeskReviewRoute,
+  DeskIndexRoute: DeskIndexRoute,
+}
+
+const DeskRouteWithChildren = DeskRoute._addFileChildren(DeskRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
+  DeskRoute: DeskRouteWithChildren,
   LoginRoute: LoginRoute,
   ApiMcpRoute: ApiMcpRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,

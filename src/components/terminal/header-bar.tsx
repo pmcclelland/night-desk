@@ -1,5 +1,5 @@
 import { Maximize2, Minimize2, Power, Settings } from "lucide-react";
-import { Link } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import { clockDate, clockTime, money, pct, signClass, signedMoney } from "@/lib/format";
 import { getMarketClock } from "@/lib/market-hours";
 import { useNow } from "@/lib/hooks";
@@ -40,11 +40,30 @@ export function HeaderBar() {
   const tape = TAPE[tapeSource];
   const alpacaVenue = venue !== "sim";
   const tapeWarn = alpacaVenue && tapeSource !== "alpaca";
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const review = pathname === "/review";
 
   return (
     <header className="flex h-11 shrink-0 items-center gap-2 border-b border-border bg-bg px-2 md:h-10 md:px-3">
       <div className="flex min-w-0 items-center gap-2">
         <span className="font-mono text-xs font-medium tracking-widest text-accent">NIGHTDESK</span>
+        <nav className="flex items-center gap-1 font-mono text-micro tracking-widest uppercase">
+          <Link
+            to="/"
+            title="Trade (P)"
+            className={cn(review ? "text-subtle hover:text-fg" : "text-accent")}
+          >
+            Trade
+          </Link>
+          <span className="text-subtle">|</span>
+          <Link
+            to="/review"
+            title="Review (P)"
+            className={cn(review ? "text-accent" : "text-subtle hover:text-fg")}
+          >
+            Review
+          </Link>
+        </nav>
         <span
           className={cn(
             "font-mono text-micro tracking-widest uppercase",
