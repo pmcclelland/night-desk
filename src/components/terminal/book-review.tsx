@@ -23,6 +23,8 @@ import {
   capJournal,
   clipJournal,
   fillsFromOrders,
+  reviewNavKeys,
+  stepReviewNav,
   type JournalFill,
   type JournalRow,
 } from "@/lib/book-journal";
@@ -229,7 +231,10 @@ export function BookReview() {
     [journalFills, curveRange, theses],
   );
   const journalNav = useMemo(() => journalRows.map((row) => `jr:${row.id}`), [journalRows]);
-  const navKeys = useMemo(() => [...symbols, ...journalNav], [symbols, journalNav]);
+  const navKeys = useMemo(
+    () => reviewNavKeys(symbols, journalRows.map((row) => row.id)),
+    [symbols, journalRows],
+  );
 
   useEffect(() => {
     if (cursor.startsWith("jr:")) {
@@ -295,10 +300,10 @@ export function BookReview() {
       const up = e.key === "k" || e.key === "K" || e.key === "ArrowUp";
       if (!down && !up) return;
       e.preventDefault();
-      const i = Math.max(0, navKeys.indexOf(cursor));
-      const next = navKeys[down ? Math.min(navKeys.length - 1, i + 1) : Math.max(0, i - 1)];
-      if (!next) return;
+      const next = stepReviewNav(navKeys, cursor, down ? 1 : -1);
+      if (!next || next === cursor) return;
       setCursor(next);
+      if (expanded && next !== expanded) setExpanded(null);
       if (symbols.includes(next)) selectSymbol(next);
     }
     window.addEventListener("keydown", onKey);
@@ -393,7 +398,7 @@ export function BookReview() {
               {view.positions.map((p) => {
                 const active = p.symbol === cursor;
                 const open = expanded === p.symbol;
-                const marked = active || open;
+                const marked = active;
                 return (
                   <Fragment key={p.symbol}>
                     <tr
@@ -484,9 +489,9 @@ export function BookReview() {
         loading={journalLoading}
         sim={simJournal}
         cursor={cursor}
-        onPick={(id, symbol) => {
+        onPick={(id) => {
           setCursor(`jr:${id}`);
-          selectSymbol(symbol);
+          setExpanded(null);
         }}
       />
       </div>

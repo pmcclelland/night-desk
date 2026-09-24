@@ -203,6 +203,23 @@ export function curvePlotScale(lo: number, hi: number) {
   return { min, max, ticks };
 }
 
+/** Below Tailwind `sm`, pin the first/last x labels to the plot edges so they stay whole. */
+export const NARROW_CURVE_W = 640;
+
+export function curveTimeLabelPlacement(
+  i: number,
+  labeled: number[],
+  x: number,
+  padL: number,
+  plotW: number,
+  width: number,
+): { x: number; anchor: "start" | "middle" | "end" } {
+  if (width >= NARROW_CURVE_W) return { x, anchor: "middle" };
+  if (i === labeled[0]) return { x: padL, anchor: "start" };
+  if (i === labeled[labeled.length - 1]) return { x: padL + plotW, anchor: "end" };
+  return { x, anchor: "middle" };
+}
+
 export function barsToPoints(bars: Bar[]): EquityPoint[] {
   return bars
     .filter((b) => Number.isFinite(b.t) && Number.isFinite(b.c))

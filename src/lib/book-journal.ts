@@ -132,6 +132,22 @@ export function capJournal(trips: ClosedRoundTrip[], cap = JOURNAL_CAP): ClosedR
   return trips.slice(0, cap);
 }
 
+export function journalNavKey(id: string) {
+  return `jr:${id}`;
+}
+
+export function reviewNavKeys(symbols: string[], journalIds: string[]) {
+  return [...symbols, ...journalIds.map(journalNavKey)];
+}
+
+export function stepReviewNav(keys: string[], cursor: string, dir: 1 | -1): string | null {
+  if (keys.length === 0) return null;
+  const i = Math.max(0, keys.indexOf(cursor));
+  const next = i + dir;
+  if (next < 0 || next >= keys.length) return keys[i] ?? null;
+  return keys[next] ?? null;
+}
+
 export function thesisSnippet(reasoning: string): string {
   const line = reasoning.split(/\n/)[0]?.trim() ?? "";
   if (line.length <= 72) return line;

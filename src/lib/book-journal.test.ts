@@ -7,6 +7,8 @@ import {
   clipJournal,
   fillsFromOrders,
   formatHold,
+  reviewNavKeys,
+  stepReviewNav,
   thesisSnippet,
   type JournalFill,
 } from "./book-journal.ts";
@@ -182,5 +184,15 @@ describe("book-journal FIFO", () => {
     assert.equal(thesisSnippet("first\nsecond"), "first");
     assert.equal(formatHold(3 * 86_400_000), "3d");
     assert.equal(formatHold(2 * 3_600_000), "2h");
+  });
+
+  it("j/k crosses from the last book row into the first journal row and back", () => {
+    const keys = reviewNavKeys(["AAPL", "TSLA"], ["nflx-1", "amd-2"]);
+    assert.deepEqual(keys, ["AAPL", "TSLA", "jr:nflx-1", "jr:amd-2"]);
+    assert.equal(stepReviewNav(keys, "TSLA", 1), "jr:nflx-1");
+    assert.equal(stepReviewNav(keys, "jr:nflx-1", -1), "TSLA");
+    assert.equal(stepReviewNav(keys, "AAPL", -1), "AAPL");
+    assert.equal(stepReviewNav(keys, "jr:amd-2", 1), "jr:amd-2");
+    assert.equal(stepReviewNav(keys, "AAPL", 1), "TSLA");
   });
 });

@@ -18,11 +18,12 @@ export function BookJournal({
   return (
     <section className="min-h-0 shrink-0 border-t border-border bg-surface">
       <div className="flex items-baseline gap-2 px-3 py-2">
-        <p className="font-mono text-micro tracking-widest text-subtle uppercase">Journal</p>
+        <p className="font-mono text-micro tracking-widest text-subtle uppercase">
+          Journal · {rows.length} closed
+        </p>
         {sim ? (
           <p className="font-mono text-micro tracking-widest text-muted uppercase">Sim</p>
         ) : null}
-        <p className="font-mono text-micro tabular-nums text-subtle">{rows.length}</p>
       </div>
       {loading && rows.length === 0 ? (
         <p className="px-3 pb-3 font-mono text-micro tracking-widest text-subtle uppercase">
@@ -49,7 +50,7 @@ export function BookJournal({
                 <th className="hidden w-px whitespace-nowrap px-2 py-1 text-right font-medium md:table-cell">
                   Out
                 </th>
-                <th className="hidden w-px whitespace-nowrap px-2 py-1 text-right font-medium sm:table-cell">
+                <th className="w-px whitespace-nowrap px-2 py-1 text-right font-medium">
                   Hold
                 </th>
                 <th className="w-px whitespace-nowrap px-2 py-1 text-right font-medium">P&L</th>
@@ -87,7 +88,7 @@ export function BookJournal({
                     <td className="hidden w-px whitespace-nowrap px-2 py-1.5 text-right text-muted md:table-cell">
                       <span className="text-subtle">{formatJournalDay(row.exitAt)}</span> {px(row.exitPrice)}
                     </td>
-                    <td className="hidden w-px whitespace-nowrap px-2 py-1.5 text-right text-muted sm:table-cell">
+                    <td className="w-px whitespace-nowrap px-2 py-1.5 text-right text-muted tabular-nums">
                       {formatHold(row.holdMs)}
                     </td>
                     <td className={cn("w-px whitespace-nowrap px-2 py-1.5 text-right", signClass(row.realizedPl))}>

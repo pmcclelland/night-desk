@@ -1,5 +1,11 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type MouseEvent, type TouchEvent } from "react";
-import { CURVE_RANGES, curvePlotScale, formatCurveAxis, type BookCurveSnapshot } from "@/lib/book-curve";
+import {
+  CURVE_RANGES,
+  curvePlotScale,
+  curveTimeLabelPlacement,
+  formatCurveAxis,
+  type BookCurveSnapshot,
+} from "@/lib/book-curve";
 import { barTime, money, pct, signClass } from "@/lib/format";
 import type { CurveRange, EquityPoint } from "@/lib/types";
 import { cn } from "@/lib/cn";
@@ -122,6 +128,7 @@ function CurveSvg({ book, spy }: { book: EquityPoint[]; spy: EquityPoint[] }) {
       }
       return segs.join(" ");
     };
+    const timeStep = Math.max(1, Math.floor(book.length / 5));
     return {
       w,
       h,
@@ -138,7 +145,8 @@ function CurveSvg({ book, spy }: { book: EquityPoint[]; spy: EquityPoint[] }) {
       bookPath: pathThrough(book),
       spyPath: pathThrough(spy),
       n: book.length,
-      timeStep: Math.max(1, Math.floor(book.length / 5)),
+      timeStep,
+      labeled: book.map((_, i) => i).filter((i) => i % timeStep === 0),
     };
   }, [book, spy, size]);
 
@@ -204,20 +212,29 @@ function CurveSvg({ book, spy }: { book: EquityPoint[]; spy: EquityPoint[] }) {
             strokeLinejoin="round"
             strokeLinecap="round"
           />
-          {book.map((p, i) =>
-            i % layout.timeStep === 0 ? (
+          {book.map((p, i) => {
+            if (i % layout.timeStep !== 0) return null;
+            const place = curveTimeLabelPlacement(
+              i,
+              layout.labeled,
+              layout.xAt(i, layout.n),
+              layout.padL,
+              layout.plotW,
+              layout.w,
+            );
+            return (
               <text
                 key={`t-${p.t}`}
-                x={layout.xAt(i, layout.n)}
+                x={place.x}
                 y={layout.h - 6}
-                textAnchor="middle"
+                textAnchor={place.anchor}
                 className="fill-subtle font-mono"
                 fontSize="10"
               >
                 {barTime(p.t, false)}
               </text>
-            ) : null,
-          )}
+            );
+          })}
           {hover !== null && book[hover] ? (
             <>
               <line

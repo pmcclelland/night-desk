@@ -6,6 +6,7 @@ import {
   curveWindow,
   nextCurveRange,
   curvePlotScale,
+  curveTimeLabelPlacement,
   formatCurveAxis,
   rebaseToStart,
   reconstructSimCurve,
@@ -119,6 +120,22 @@ describe("book-curve", () => {
   it("seriesReturn is null on an empty or zero start", () => {
     assert.equal(seriesReturn([]), null);
     assert.equal(seriesReturn([pt("2026-09-22", 0), pt("2026-09-23", 10)]), null);
+  });
+
+  it("pins first and last x labels to the plot edges only when the plot is narrow", () => {
+    const labeled = [0, 4, 8, 12];
+    const wide = curveTimeLabelPlacement(0, labeled, 20, 8, 200, 800);
+    assert.equal(wide.anchor, "middle");
+    assert.equal(wide.x, 20);
+    const first = curveTimeLabelPlacement(0, labeled, 20, 8, 200, 390);
+    assert.equal(first.anchor, "start");
+    assert.equal(first.x, 8);
+    const last = curveTimeLabelPlacement(12, labeled, 190, 8, 200, 390);
+    assert.equal(last.anchor, "end");
+    assert.equal(last.x, 208);
+    const mid = curveTimeLabelPlacement(4, labeled, 80, 8, 200, 390);
+    assert.equal(mid.anchor, "middle");
+    assert.equal(mid.x, 80);
   });
 
   it("pads the plot after nicing so the series floor is not a gridline", () => {
