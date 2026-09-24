@@ -361,12 +361,12 @@ export function BookReview() {
 
       <SignalsPanel symbols={symbols} signals={signals} />
 
+      <div className="min-h-0 flex-1 overflow-auto">
       {view.positions.length === 0 ? (
-        <div className="flex flex-1 items-center justify-center px-4 font-mono text-micro tracking-widest text-subtle uppercase">
+        <div className="flex items-center justify-center px-4 py-8 font-mono text-micro tracking-widest text-subtle uppercase">
           No open risk
         </div>
       ) : (
-        <div className="min-h-0 flex-1 overflow-auto">
           <table className="w-full border-separate border-spacing-0 font-mono text-2xs tabular-nums">
             <thead className="sticky top-0 bg-surface text-micro tracking-widest text-subtle uppercase">
               <tr>
@@ -478,7 +478,6 @@ export function BookReview() {
               })}
             </tbody>
           </table>
-        </div>
       )}
       <BookJournal
         rows={journalRows}
@@ -490,6 +489,7 @@ export function BookReview() {
           selectSymbol(symbol);
         }}
       />
+      </div>
       <p className="shrink-0 border-t border-border px-3 py-2 font-mono text-micro tracking-widest text-subtle uppercase">
         j k move · enter thesis · r range · g trade · p desk
       </p>
