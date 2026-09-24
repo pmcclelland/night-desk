@@ -158,7 +158,7 @@ A SNAP → LIVE flip in settings applies on both routes because the loop is shar
 
 1. **Session hoist + `/review` + mode chrome.** Pathless `_desk` layout owns auth, hydrate, SNAP/LIVE loop, header, settings. `/review` is its own view with a book table from `useLiveBook` (weight, day P&L, total P&L; thesis column empty until slice 2). `P` toggles `/` ↔ `/review`. Header TRADE | REVIEW. Review keys: `j`/`k`/arrows, Enter, `G`, Esc. Verify: quotes survive `P`; SNAP does not start a new loop; guest still public Yahoo and never hits Alpaca; `P` ignored in inputs; `F` / `Shift+F` / `/` unchanged on the desk.
 
-2. **Thesis persist.** Owner: `listDeskKv` / `putDeskKv` `ns=thesis`. Guest: local persist. Inline edit on `/review`. Verify: owner thesis survives reload; guest thesis does not hit Neon; empty names stay empty.
+2. **Thesis persist (slice 2).** Owner: `listTheses` / `putThesis` → `desk_kv` `ns=thesis`. Guest: `nightdesk.theses.guest` local-only, never Neon. Inline edit on `/review`. Thesis health: age, % move since `writtenPrice`, stale at 30d. Brain signals: read-only `public.signals` via `TRADER_SUPABASE_URL` + `TRADER_SUPABASE_ANON_KEY`; degrade to “signals not connected”. Verify: owner thesis survives reload; guest thesis does not hit Neon; empty names stay empty; missing env / denied anon SELECT does not crash.
 
 ## 6. Decisions (locked 2026-09-24)
 
@@ -179,3 +179,12 @@ Paul approved all eight defaults.
 7. **Closed positions.** **Omit in v1.** SIM drops flat names; Alpaca `/v2/positions` is open risk; `desk_events` is write-only fills.
 
 8. **In-view keys on `/review`.** **`j`/`k` or arrows** move the row, **Enter** expand/collapse thesis, **`G`** (`selectSymbol` + `/`), **`P`** back to the desk. `Esc` collapses, then (second press) returns to `/`.
+
+## Later slices
+
+Approved remaining panels, in order. Not in slice 2.
+
+3. **Equity curve vs SPY** — 1W / 1M / 3M, Alpaca portfolio history (`fetchEquityHistory` is already unused in `trade.ts`).
+4. **Trade journal** — closed positions: hold time, realized P&L, thesis at exit.
+5. **Concentration** — top-5 share, sector split, cash %.
+6. **Upcoming catalysts** — earnings + ex-div next 2 weeks; dividends from Alpaca; earnings need a source.

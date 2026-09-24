@@ -46,7 +46,7 @@ export function HeaderBar() {
     <header className="flex h-11 shrink-0 items-center gap-2 border-b border-border bg-bg px-2 md:h-10 md:px-3">
       <div className="flex shrink-0 items-baseline gap-2">
         <span className="font-mono text-xs font-medium tracking-widest text-accent">NIGHTDESK</span>
-        <nav role="group" aria-label="Desk mode" className="flex items-baseline">
+        <nav role="group" aria-label="Desk mode" className="flex items-center">
           <Link
             to="/"
             title="Trade (P)"
@@ -57,11 +57,12 @@ export function HeaderBar() {
           >
             Trade
           </Link>
+          <span className="mx-0.5 inline-block h-3 w-px shrink-0 self-center bg-border" aria-hidden />
           <Link
             to="/review"
             title="Review (P)"
             className={cn(
-              "border-l border-border px-1.5 py-2.5 font-mono text-2xs leading-6 tracking-widest uppercase md:py-2",
+              "px-1.5 py-2.5 font-mono text-2xs leading-6 tracking-widest uppercase md:py-2",
               review ? "text-accent" : "text-subtle hover:text-fg",
             )}
           >

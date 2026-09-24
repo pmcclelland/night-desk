@@ -1,6 +1,13 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { positionDayPlPct, positionWeightPct, toBookPerformanceView } from "./book-view.ts";
+import {
+  formatThesisAge,
+  positionDayPlPct,
+  positionWeightPct,
+  thesisHealth,
+  toBookPerformanceView,
+  type BookThesis,
+} from "./book-view.ts";
 import type { Account, Position } from "./types.ts";
 
 const account: Account = {
@@ -31,6 +38,20 @@ const pos: Position = {
   dayPl: 20,
 };
 
+const thesis: BookThesis = {
+  symbol: "AAPL",
+  reasoning: "add on AI spend",
+  conviction: "high",
+  drivers: ["AI"],
+  invalidation: "break 90",
+  target: 140,
+  asOf: "2026-08-25T00:00:00.000Z",
+  lastReviewed: "2026-09-24T00:00:00.000Z",
+  writtenAt: "2026-08-25T00:00:00.000Z",
+  updatedAt: "2026-09-24T00:00:00.000Z",
+  writtenPrice: 100,
+};
+
 describe("book-view", () => {
   it("derives weight and day pct from market value", () => {
     assert.equal(positionWeightPct(10_000, 100_000), 10);
@@ -50,8 +71,43 @@ describe("book-view", () => {
     });
     assert.equal(view.positions.length, 1);
     assert.equal(view.positions[0]?.thesis, null);
+    assert.equal(view.positions[0]?.health, null);
     assert.equal(view.unrealizedPl, 100);
     assert.equal(view.realizedToday, 250);
     assert.equal(view.positions[0]?.weightPct, positionWeightPct(1_100, 100_000));
+  });
+
+  it("attaches thesis health: age, move since written, stale at 30d", () => {
+    const now = Date.parse("2026-09-24T00:00:00.000Z");
+    const fresh = thesisHealth(thesis, 110, now);
+    assert.ok(fresh);
+    assert.equal(Math.floor(fresh.ageDays), 30);
+    assert.equal(fresh.movePct, 10);
+    assert.equal(fresh.stale, true);
+    assert.equal(formatThesisAge(fresh.ageDays), "30d");
+
+    const young = thesisHealth(
+      { ...thesis, writtenAt: "2026-09-20T00:00:00.000Z", asOf: "2026-09-20T00:00:00.000Z" },
+      110,
+      now,
+    );
+    assert.ok(young);
+    assert.equal(young.stale, false);
+    assert.equal(formatThesisAge(0.2), "5h");
+  });
+
+  it("joins a stored thesis onto the row", () => {
+    const view = toBookPerformanceView({
+      venue: "sim",
+      guest: false,
+      liveFeed: false,
+      asOf: Date.parse("2026-09-24T00:00:00.000Z"),
+      account,
+      positions: [pos],
+      theses: { AAPL: thesis },
+    });
+    assert.equal(view.positions[0]?.thesis?.reasoning, "add on AI spend");
+    assert.equal(view.positions[0]?.health?.stale, true);
+    assert.equal(view.positions[0]?.health?.movePct, 10);
   });
 });

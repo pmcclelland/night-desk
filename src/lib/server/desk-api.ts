@@ -1,9 +1,19 @@
 import { createServerFn } from "@tanstack/react-start";
 import { authMiddleware } from "@/lib/auth/middleware";
+import type { BookThesis } from "@/lib/book-view";
 import { executeDeskOp, type DeskOp } from "@/lib/server/desk-engine";
 import { captureAlpacaBook } from "@/lib/server/desk-ledger";
+import { deleteDeskKv, getDeskKv, listDeskKv, putDeskKv } from "@/lib/server/desk-kv";
 import { claimOwner, loadDesk, publicDesk, requireOwner, type DeskSnapshot } from "@/lib/server/desk-store";
 import { createMcpToken, listMcpTokens, revokeMcpToken } from "@/lib/server/mcp-token.server";
+import {
+  mergeThesisWrite,
+  normalizeThesis,
+  thesesFromRows,
+  thesisIsBlank,
+  thesisKey,
+  type ThesisDraft,
+} from "@/lib/thesis";
 
 export const getDeskAccess = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
@@ -80,4 +90,28 @@ export const revokeDeskToken = createServerFn({ method: "POST" })
     await requireOwner(context.userId);
     await revokeMcpToken(context.userId, data.id);
     return { ok: true as const };
+  });
+
+export const listTheses = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .handler(async ({ context }) => {
+    const rows = await listDeskKv<unknown>(context.userId, "thesis");
+    return thesesFromRows(rows);
+  });
+
+export const putThesis = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: ThesisDraft) => input)
+  .handler(async ({ context, data }) => {
+    const key = thesisKey(data.symbol);
+    if (thesisIsBlank(data)) {
+      await deleteDeskKv(context.userId, "thesis", key);
+      return { thesis: null as BookThesis | null };
+    }
+    const existing = normalizeThesis(await getDeskKv<unknown>(context.userId, "thesis", key), {
+      symbol: data.symbol,
+    });
+    const thesis = mergeThesisWrite(existing, data);
+    await putDeskKv(context.userId, "thesis", key, thesis);
+    return { thesis };
   });
