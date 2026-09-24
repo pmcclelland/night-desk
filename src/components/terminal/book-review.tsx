@@ -107,13 +107,21 @@ export function BookReview() {
           <table className="w-full font-mono text-2xs tabular-nums">
             <thead className="sticky top-0 bg-surface text-micro tracking-widest text-subtle uppercase">
               <tr>
-                <th className="px-2 py-1 text-left font-medium">Sym</th>
-                <th className="hidden px-2 py-1 text-right font-medium sm:table-cell">Qty</th>
-                <th className="hidden px-2 py-1 text-right font-medium md:table-cell">Wgt</th>
-                <th className="hidden px-2 py-1 text-right font-medium sm:table-cell">Cost</th>
-                <th className="px-2 py-1 text-right font-medium">P&L</th>
-                <th className="hidden px-2 py-1 text-right font-medium md:table-cell">Day</th>
-                <th className="px-2 py-1 text-left font-medium">Thesis</th>
+                <th className="w-px whitespace-nowrap px-2 py-1 text-left font-medium">Sym</th>
+                <th className="hidden w-px whitespace-nowrap px-2 py-1 text-right font-medium sm:table-cell">
+                  Qty
+                </th>
+                <th className="hidden w-px whitespace-nowrap px-2 py-1 text-right font-medium md:table-cell">
+                  Wgt
+                </th>
+                <th className="hidden w-px whitespace-nowrap px-2 py-1 text-right font-medium sm:table-cell">
+                  Cost
+                </th>
+                <th className="w-px whitespace-nowrap px-2 py-1 text-right font-medium">P&L</th>
+                <th className="hidden w-px whitespace-nowrap px-2 py-1 text-right font-medium md:table-cell">
+                  Day
+                </th>
+                <th className="w-full px-2 py-1 text-left font-medium">Thesis</th>
               </tr>
             </thead>
             <tbody>
@@ -134,20 +142,31 @@ export function BookReview() {
                       selectSymbol(p.symbol);
                     }}
                   >
-                    <td className="px-2 py-1.5 text-fg">{p.symbol}</td>
-                    <td className="hidden px-2 py-1.5 text-right sm:table-cell">{qty(p.qty)}</td>
-                    <td className="hidden px-2 py-1.5 text-right md:table-cell">{pct(p.weightPct, false)}</td>
-                    <td className="hidden px-2 py-1.5 text-right text-muted sm:table-cell">{px(p.avgPrice)}</td>
-                    <td className={cn("px-2 py-1.5 text-right", signClass(p.unrealizedPl))}>
+                    <td className="w-px whitespace-nowrap px-2 py-1.5 text-left text-fg">{p.symbol}</td>
+                    <td className="hidden w-px whitespace-nowrap px-2 py-1.5 text-right sm:table-cell">
+                      {qty(p.qty)}
+                    </td>
+                    <td className="hidden w-px whitespace-nowrap px-2 py-1.5 text-right md:table-cell">
+                      {pct(p.weightPct, false)}
+                    </td>
+                    <td className="hidden w-px whitespace-nowrap px-2 py-1.5 text-right text-muted sm:table-cell">
+                      {px(p.avgPrice)}
+                    </td>
+                    <td className={cn("w-px whitespace-nowrap px-2 py-1.5 text-right", signClass(p.unrealizedPl))}>
                       {signedMoney(p.unrealizedPl)}{" "}
                       <span className="text-micro">{pct(p.unrealizedPlPct)}</span>
                     </td>
-                    <td className={cn("hidden px-2 py-1.5 text-right md:table-cell", signClass(p.dayPl))}>
+                    <td
+                      className={cn(
+                        "hidden w-px whitespace-nowrap px-2 py-1.5 text-right md:table-cell",
+                        signClass(p.dayPl),
+                      )}
+                    >
                       {signedMoney(p.dayPl)}{" "}
                       <span className="text-micro">{pct(p.dayPlPct)}</span>
                     </td>
-                    <td className="px-2 py-1.5 text-left text-subtle">
-                      {open ? "—" : p.thesis?.reasoning || "—"}
+                    <td className="w-full px-2 py-1.5 text-left text-subtle">
+                      <span className="block max-w-[60ch]">{open ? "—" : p.thesis?.reasoning || "—"}</span>
                     </td>
                   </tr>
                 );
@@ -178,9 +197,11 @@ function Stat({
   valueClass?: string;
 }) {
   return (
-    <div className="flex min-w-0 flex-col leading-none">
+    <div className="flex flex-col leading-none">
       <span className="font-mono text-micro tracking-widest text-subtle uppercase">{label}</span>
-      <span className={cn("truncate font-mono text-2xs tabular-nums text-fg", valueClass)}>{value}</span>
+      <span className={cn("whitespace-nowrap font-mono text-2xs tabular-nums text-fg", valueClass)}>
+        {value}
+      </span>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { Maximize2, Minimize2, Power, Settings } from "lucide-react";
+import { Maximize2, Minimize2, Power, Settings, User } from "lucide-react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { clockDate, clockTime, money, pct, signClass, signedMoney } from "@/lib/format";
 import { getMarketClock } from "@/lib/market-hours";
@@ -44,21 +44,26 @@ export function HeaderBar() {
 
   return (
     <header className="flex h-11 shrink-0 items-center gap-2 border-b border-border bg-bg px-2 md:h-10 md:px-3">
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="flex shrink-0 items-baseline gap-2">
         <span className="font-mono text-xs font-medium tracking-widest text-accent">NIGHTDESK</span>
-        <nav className="flex shrink-0 items-center gap-1 font-mono text-micro tracking-widest uppercase">
+        <nav role="group" aria-label="Desk mode" className="flex items-baseline">
           <Link
             to="/"
             title="Trade (P)"
-            className={cn(review ? "text-subtle hover:text-fg" : "text-accent")}
+            className={cn(
+              "px-1.5 py-2.5 font-mono text-2xs leading-6 tracking-widest uppercase md:py-2",
+              review ? "text-subtle hover:text-fg" : "text-accent",
+            )}
           >
             Trade
           </Link>
-          <span className="text-subtle">|</span>
           <Link
             to="/review"
             title="Review (P)"
-            className={cn(review ? "text-accent" : "text-subtle hover:text-fg")}
+            className={cn(
+              "border-l border-border px-1.5 py-2.5 font-mono text-2xs leading-6 tracking-widest uppercase md:py-2",
+              review ? "text-accent" : "text-subtle hover:text-fg",
+            )}
           >
             Review
           </Link>
@@ -125,12 +130,17 @@ export function HeaderBar() {
           )}
         </div>
 
-        <Stat label="EQ" value={money(account.equity, true)} />
+        <Stat
+          label="EQ"
+          value={money(account.equity, true)}
+          className={cn(review && "hidden sm:flex")}
+        />
         <Stat label="CASH" value={money(account.cash, true)} className="hidden sm:flex" />
         <Stat
           label="DAY"
           value={`${signedMoney(account.dayPl)} ${pct(account.dayPlPct)}`}
           valueClass={signClass(account.dayPl)}
+          className="hidden sm:flex"
         />
 
         <Button
@@ -176,9 +186,11 @@ function OperatorChip() {
     return (
       <Link
         to="/login"
-        className="font-mono text-micro tracking-widest text-muted uppercase hover:text-fg"
+        aria-label="Sign in"
+        className="inline-flex items-center font-mono text-micro tracking-widest whitespace-nowrap text-muted uppercase hover:text-fg"
       >
-        Sign in
+        <span className="hidden sm:inline">Sign in</span>
+        <User className="size-4 sm:hidden" />
       </Link>
     );
   }
@@ -207,9 +219,9 @@ function Stat({
   valueClass?: string;
 }) {
   return (
-    <div className={cn("flex min-w-0 flex-col leading-none", className)}>
+    <div className={cn("flex shrink-0 flex-col leading-none", className)}>
       <span className="font-mono text-micro tracking-widest text-subtle uppercase">{label}</span>
-      <span className={cn("truncate font-mono text-2xs tabular-nums text-fg", valueClass)}>
+      <span className={cn("whitespace-nowrap font-mono text-2xs tabular-nums text-fg", valueClass)}>
         {value}
       </span>
     </div>
