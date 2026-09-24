@@ -6,10 +6,17 @@ import {
   type BookThesis,
   type Conviction,
 } from "@/lib/book-view";
+import {
+  clipCatalysts,
+  heldCatalysts,
+  seedCatalysts,
+  type CatalystRow,
+} from "@/lib/book-catalysts";
 import { toConcentrationSnapshot } from "@/lib/book-concentration";
 import { money, pct, px, qty, signClass, signedMoney } from "@/lib/format";
 import { isTypingTarget } from "@/lib/keys";
 import { selectSymbol } from "@/lib/desk-sync";
+import { BookCatalysts } from "@/components/terminal/book-catalysts";
 import { BookConcentration } from "@/components/terminal/book-concentration";
 import { BookCurvePanel } from "@/components/terminal/book-curve";
 import { BookJournal } from "@/components/terminal/book-journal";
@@ -30,7 +37,13 @@ import {
   type JournalFill,
   type JournalRow,
 } from "@/lib/book-journal";
-import { fetchOwnerBookCurve, fetchOwnerJournalFills, listTheses, putThesis } from "@/lib/server/desk-api";
+import {
+  fetchOwnerBookCurve,
+  fetchOwnerCatalysts,
+  fetchOwnerJournalFills,
+  listTheses,
+  putThesis,
+} from "@/lib/server/desk-api";
 import { fetchPublicCurveSeries } from "@/lib/server/market";
 import { fetchBrainSignals } from "@/lib/server/trader-signals";
 import { disconnectedSignals, SIGNALS_NOT_CONNECTED, type SignalsSnapshot } from "@/lib/signals";
@@ -94,6 +107,8 @@ export function BookReview() {
   const [curveLoading, setCurveLoading] = useState(true);
   const [journalFills, setJournalFills] = useState<JournalFill[]>([]);
   const [journalLoading, setJournalLoading] = useState(true);
+  const [catalysts, setCatalysts] = useState<CatalystRow[]>([]);
+  const [catalystLoading, setCatalystLoading] = useState(true);
 
   const view = useMemo(
     () =>
@@ -226,6 +241,31 @@ export function BookReview() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- orders snapshotted via orderKey
   }, [curveRange, useAlpacaCurve, orderKey]);
+
+  useEffect(() => {
+    let live = true;
+    if (simJournal) {
+      setCatalysts(heldCatalysts(clipCatalysts(seedCatalysts()), symbols));
+      setCatalystLoading(false);
+      return;
+    }
+    setCatalystLoading(true);
+    void fetchOwnerCatalysts({ data: { symbols } })
+      .then((raw) => {
+        if (live) setCatalysts(raw.rows);
+      })
+      .catch(() => {
+        if (live) setCatalysts([]);
+      })
+      .finally(() => {
+        if (live) setCatalystLoading(false);
+      });
+    return () => {
+      live = false;
+    };
+    // Held names only — do not refetch on every LIVE mark.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- symbols via tickerKey
+  }, [simJournal, tickerKey]);
 
   const concentration = useMemo(
     () =>
@@ -507,6 +547,7 @@ export function BookReview() {
         }}
       />
       <BookConcentration snap={concentration} sim={simJournal} />
+      <BookCatalysts rows={catalysts} loading={catalystLoading} sim={simJournal} />
       </div>
       <p className="shrink-0 border-t border-border px-3 py-2 font-mono text-micro tracking-widest text-subtle uppercase">
         j k move · enter thesis · r range · g trade · p desk
