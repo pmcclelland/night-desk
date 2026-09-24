@@ -163,6 +163,12 @@ export function toBookCurveSnapshot(input: {
   };
 }
 
+export function formatCurveAxis(n: number): string {
+  if (!Number.isFinite(n)) return "—";
+  if (Math.abs(n) >= 1000) return Math.round(n).toLocaleString("en-US");
+  return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 export function barsToPoints(bars: Bar[]): EquityPoint[] {
   return bars
     .filter((b) => Number.isFinite(b.t) && Number.isFinite(b.c))

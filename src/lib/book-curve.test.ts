@@ -5,6 +5,7 @@ import {
   clipEquityForCurve,
   curveWindow,
   nextCurveRange,
+  formatCurveAxis,
   rebaseToStart,
   reconstructSimCurve,
   seriesReturn,
@@ -117,6 +118,13 @@ describe("book-curve", () => {
   it("seriesReturn is null on an empty or zero start", () => {
     assert.equal(seriesReturn([]), null);
     assert.equal(seriesReturn([pt("2026-09-22", 0), pt("2026-09-23", 10)]), null);
+  });
+
+  it("formats axis labels with grouping on both large and small values", () => {
+    assert.equal(formatCurveAxis(105000), "105,000");
+    assert.equal(formatCurveAxis(100000), "100,000");
+    assert.equal(formatCurveAxis(12.5), "12.50");
+    assert.equal(formatCurveAxis(Number.NaN), "—");
   });
 
   it("rebaseToStart scales a series to a shared origin", () => {

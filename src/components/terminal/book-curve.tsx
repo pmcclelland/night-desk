@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent, type TouchEvent } from "react";
-import { CURVE_RANGES, type BookCurveSnapshot } from "@/lib/book-curve";
+import { Fragment, useEffect, useMemo, useRef, useState, type MouseEvent, type TouchEvent } from "react";
+import { CURVE_RANGES, formatCurveAxis, type BookCurveSnapshot } from "@/lib/book-curve";
 import { barTime, money, pct, signClass } from "@/lib/format";
 import type { CurveRange, EquityPoint } from "@/lib/types";
 import { cn } from "@/lib/cn";
@@ -20,7 +20,7 @@ export function BookCurvePanel({
   const vs = snap?.vsSpy ?? null;
   return (
     <section className="shrink-0 border-b border-border bg-surface px-3 py-2">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <div className="flex items-baseline gap-2">
           <p className="font-mono text-micro tracking-widest text-subtle uppercase">Curve</p>
           {snap?.label === "sim" ? (
@@ -29,26 +29,38 @@ export function BookCurvePanel({
         </div>
         <div role="group" aria-label="Curve range" className="flex items-center">
           {CURVE_RANGES.map((r, i) => (
-            <button
-              key={r}
-              type="button"
-              aria-pressed={r === range}
-              onClick={() => onRange(r)}
-              className={cn(
-                "h-6 px-1.5 font-mono text-micro tracking-wide",
-                i > 0 && "border-l border-border",
-                r === range ? "text-accent" : "text-subtle hover:text-fg",
-              )}
-            >
-              {r}
-            </button>
+            <Fragment key={r}>
+              {i > 0 ? (
+                <span className="mx-0.5 inline-block h-3 w-px shrink-0 self-center bg-border" aria-hidden />
+              ) : null}
+              <button
+                type="button"
+                aria-pressed={r === range}
+                onClick={() => onRange(r)}
+                className={cn(
+                  "px-1.5 py-2.5 font-mono text-2xs leading-6 tracking-widest uppercase md:py-2",
+                  r === range ? "text-accent" : "text-subtle hover:text-fg",
+                )}
+              >
+                {r}
+              </button>
+            </Fragment>
           ))}
         </div>
       </div>
-      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-mono text-2xs tabular-nums">
-        <span className={cn(signClass(bookRet ?? 0))}>Book {bookRet != null ? pct(bookRet) : "—"}</span>
-        <span className={cn(signClass(spyRet ?? 0))}>SPY {spyRet != null ? pct(spyRet) : "—"}</span>
-        <span className={cn(signClass(vs ?? 0))}>vs {vs != null ? pct(vs) : "—"}</span>
+      <div className="mt-1 flex flex-wrap items-baseline gap-x-4 gap-y-1 font-mono text-2xs tabular-nums">
+        <span>
+          <span className="text-accent">Book</span>{" "}
+          <span className={signClass(bookRet ?? 0)}>{bookRet != null ? pct(bookRet) : "—"}</span>
+        </span>
+        <span>
+          <span className="text-muted">SPY</span>{" "}
+          <span className={signClass(spyRet ?? 0)}>{spyRet != null ? pct(spyRet) : "—"}</span>
+        </span>
+        <span>
+          <span className="text-subtle">vs</span>{" "}
+          <span className={signClass(vs ?? 0)}>{vs != null ? pct(vs) : "—"}</span>
+        </span>
       </div>
       <div className="relative mt-2 h-36">
         {loading && !snap ? (
@@ -90,8 +102,8 @@ function CurveSvg({ book, spy }: { book: EquityPoint[]; spy: EquityPoint[] }) {
     const { w, h } = size;
     if (w < 8 || h < 8 || book.length === 0) return null;
     const padL = 8;
-    const padR = 52;
-    const padT = 10;
+    const padR = 60;
+    const padT = 14;
     const padB = 20;
     const plotW = w - padL - padR;
     const plotH = h - padT - padB;
@@ -99,8 +111,8 @@ function CurveSvg({ book, spy }: { book: EquityPoint[]; spy: EquityPoint[] }) {
     const hi = Math.max(...values);
     const lo = Math.min(...values);
     const span = (Number.isFinite(hi) && Number.isFinite(lo) ? hi - lo : 0) || 1;
-    const min = lo - span * 0.04;
-    const max = hi + span * 0.04;
+    const min = lo - span * 0.08;
+    const max = hi + span * 0.08;
     const xAt = (i: number, n: number) => padL + ((i + 0.5) / n) * plotW;
     const yAt = (p: number) => padT + ((max - p) / (max - min)) * plotH;
     const pathThrough = (pts: EquityPoint[]) => {
@@ -112,7 +124,7 @@ function CurveSvg({ book, spy }: { book: EquityPoint[]; spy: EquityPoint[] }) {
       }
       return segs.join(" ");
     };
-    const ticks = niceTicks(min, max, 4);
+    const ticks = niceTicks(min, max, 4).filter((t) => t >= min && t <= max);
     return {
       w,
       h,
@@ -156,6 +168,7 @@ function CurveSvg({ book, spy }: { book: EquityPoint[]; spy: EquityPoint[] }) {
         >
           {layout.ticks.map((t) => {
             const y = layout.yAt(t);
+            const isTop = t === Math.max(...layout.ticks);
             return (
               <g key={t}>
                 <line
@@ -168,13 +181,13 @@ function CurveSvg({ book, spy }: { book: EquityPoint[]; spy: EquityPoint[] }) {
                 />
                 <text
                   x={layout.w - 6}
-                  y={y}
+                  y={isTop ? y - 2 : y}
                   textAnchor="end"
-                  dominantBaseline="middle"
-                  className="fill-subtle font-mono"
+                  dominantBaseline={isTop ? "auto" : "middle"}
+                  className="fill-subtle font-mono tabular-nums"
                   fontSize="10"
                 >
-                  {t >= 1000 ? t.toFixed(0) : t.toFixed(2)}
+                  {formatCurveAxis(t)}
                 </text>
               </g>
             );
