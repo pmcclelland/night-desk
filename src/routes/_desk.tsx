@@ -1,15 +1,15 @@
-import { useEffect, useLayoutEffect, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
-import { TerminalShell } from "@/components/terminal/shell";
+import { useEffect, useLayoutEffect, useState, type ReactNode } from "react";
+import { createFileRoute, Outlet } from "@tanstack/react-router";
+import { DeskSession } from "@/components/terminal/desk-session";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { signOut } from "@/lib/auth/client";
 import { getDeskAccess } from "@/lib/server/desk-api";
 import { useDesk } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 
-export const Route = createFileRoute("/")({ component: Home });
+export const Route = createFileRoute("/_desk")({ component: DeskLayout });
 
-function Home() {
+function DeskLayout() {
   const { user, isPending } = useCurrentUserState();
   const [access, setAccess] = useState<{ owner: boolean } | null>(null);
   const userId = user?.id;
@@ -47,19 +47,17 @@ function Home() {
   }, [userId]);
 
   if (isPending) {
+    return <Splash text="NIGHTDESK" />;
+  }
+  if (guest) {
     return (
-      <div className="grid h-dvh place-items-center bg-bg text-fg">
-        <p className="font-mono text-xs tracking-widest text-muted">NIGHTDESK</p>
-      </div>
+      <DeskSession guest>
+        <Outlet />
+      </DeskSession>
     );
   }
-  if (guest) return <TerminalShell guest />;
   if (!access) {
-    return (
-      <div className="grid h-dvh place-items-center bg-bg text-fg">
-        <p className="font-mono text-xs tracking-widest text-muted">Claiming desk…</p>
-      </div>
-    );
+    return <Splash text="Claiming desk…" />;
   }
   if (!access.owner) {
     return (
@@ -78,5 +76,17 @@ function Home() {
     );
   }
 
-  return <TerminalShell />;
+  return (
+    <DeskSession>
+      <Outlet />
+    </DeskSession>
+  );
+}
+
+function Splash({ text }: { text: ReactNode }) {
+  return (
+    <div className="grid h-dvh place-items-center bg-bg text-fg">
+      <p className="font-mono text-xs tracking-widest text-muted">{text}</p>
+    </div>
+  );
 }

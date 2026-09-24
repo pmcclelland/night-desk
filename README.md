@@ -57,9 +57,14 @@ Anything that is not a command is sent to Grok as a terse desk copilot. **Thesis
 
 | Key | Action |
 | --- | --- |
+| `P` | Toggle trade / review |
 | `F` | Focus / unfocus the chart |
 | `Shift+F` | Fullscreen the desk |
 | `Esc` | Exit focus or fullscreen |
+| `/` | Focus the bot |
+| Review: `j`/`k` or arrows | Move between names |
+| Review: `Enter` | Expand / collapse thesis |
+| Review: `G` | Open that name on the trade desk |
 
 ## Stack
 

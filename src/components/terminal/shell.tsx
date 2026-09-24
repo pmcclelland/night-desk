@@ -1,7 +1,5 @@
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useEffect } from "react";
 import { Group, Panel as RPanel, Separator, useDefaultLayout } from "react-resizable-panels";
-import { Toaster } from "sonner";
-import { HeaderBar } from "@/components/terminal/header-bar";
 import { TickerTape } from "@/components/terminal/ticker-tape";
 import { Watchlist } from "@/components/terminal/watchlist";
 import { CandleChart } from "@/components/terminal/candle-chart";
@@ -9,18 +7,10 @@ import { OrderTicket } from "@/components/terminal/order-ticket";
 import { Blotter } from "@/components/terminal/blotter";
 import { BotConsole } from "@/components/terminal/bot-console";
 import { StrategyLab } from "@/components/terminal/strategy-lab";
-import { SettingsDialog } from "@/components/terminal/settings-dialog";
 import { useIsDesktop } from "@/lib/hooks";
-import { selectLiveFeed, selectVenue, useDesk, type MobileTab } from "@/lib/store";
-import { startLiveLoop, stopLiveLoop } from "@/lib/live-loop";
-import { refreshAlpaca, refreshBars, refreshQuotes, tickStrategies } from "@/lib/sync";
-import { hydrateDesk } from "@/lib/desk-sync";
-import {
-  exitNativeFullscreen,
-  isNativeFullscreen,
-  requestNativeFullscreen,
-  subscribeFullscreen,
-} from "@/lib/fullscreen";
+import { isTypingTarget } from "@/lib/keys";
+import { useDesk, type MobileTab } from "@/lib/store";
+import { refreshBars } from "@/lib/sync";
 import { cn } from "@/lib/cn";
 
 const TABS: { id: MobileTab; label: string }[] = [
@@ -31,13 +21,7 @@ const TABS: { id: MobileTab; label: string }[] = [
   { id: "bot", label: "Bot" },
 ];
 
-function isTypingTarget(el: EventTarget | null) {
-  if (!(el instanceof HTMLElement)) return false;
-  const tag = el.tagName;
-  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.isContentEditable;
-}
-
-export function TerminalShell({ guest = false }: { guest?: boolean }) {
+export function TerminalShell() {
   const desktop = useIsDesktop();
   const selected = useDesk((s) => s.selected);
   const barRange = useDesk((s) => s.barRange);
@@ -45,107 +29,14 @@ export function TerminalShell({ guest = false }: { guest?: boolean }) {
   const setMobileTab = useDesk((s) => s.setMobileTab);
   const immersive = useDesk((s) => s.immersive);
   const chartFocus = useDesk((s) => s.chartFocus);
-  const liveFeed = useDesk(selectLiveFeed);
-  const rootRef = useRef<HTMLDivElement>(null);
-
-  const live = useRef(false);
-
-  useLayoutEffect(() => {
-    useDesk.getState().setGuestDemo(guest);
-  }, [guest]);
 
   useEffect(() => {
-    let cancelled = false;
-    const s = useDesk.getState();
-    if (s.botLog.length === 0) {
-      s.log(
-        "sys",
-        guest
-          ? "NIGHTDESK online. Venue SIM (public demo). Yahoo tape LIVE. Sign in for paper/live."
-          : "NIGHTDESK online. Venue SIM. Type HELP. Freeform goes to the Grok Bot.",
-      );
-    }
-    if (guest) {
-      live.current = true;
-      void refreshQuotes({ force: true });
-      void refreshBars();
-      return;
-    }
-    void hydrateDesk({ force: true }).then(() => {
-      if (cancelled) return;
-      live.current = true;
-      void refreshQuotes({ force: true });
-      void refreshBars();
-      if (selectVenue(useDesk.getState()) !== "sim") void refreshAlpaca({ force: true });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [guest]);
-
-  useEffect(() => {
-    if (!live.current) return;
     void refreshBars();
   }, [selected, barRange]);
 
   useEffect(() => {
-    if (!liveFeed) {
-      // SNAP must stop any leftover loop, not just skip starting one.
-      stopLiveLoop();
-      return;
-    }
-    const refreshBook = () => {
-      if (selectVenue(useDesk.getState()) !== "sim") void refreshAlpaca();
-    };
-    void refreshQuotes();
-    refreshBook();
-    return startLiveLoop({
-      refreshQuotes: () => void refreshQuotes(),
-      refreshAlpaca: refreshBook,
-      tickStrategies: () => void tickStrategies(),
-      hydrateDesk: () => void hydrateDesk(),
-      isLive: () => selectLiveFeed(useDesk.getState()),
-    });
-  }, [liveFeed]);
-
-  useEffect(() => {
-    return subscribeFullscreen(() => {
-      useDesk.getState().setImmersive(isNativeFullscreen());
-    });
-  }, []);
-
-  useEffect(() => {
-    const el = rootRef.current;
-    if (!el) return;
-    if (!immersive) {
-      if (isNativeFullscreen()) void exitNativeFullscreen();
-      return;
-    }
-    if (isNativeFullscreen()) return;
-    void requestNativeFullscreen(el);
-  }, [immersive]);
-
-  useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        const st = useDesk.getState();
-        if (st.chartFocus) {
-          st.setChartFocus(false);
-          e.preventDefault();
-          return;
-        }
-        if (st.immersive) {
-          st.setImmersive(false);
-          e.preventDefault();
-        }
-        return;
-      }
       if (isTypingTarget(e.target)) return;
-      if (e.key === "F" && e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey) {
-        e.preventDefault();
-        useDesk.getState().setImmersive(!useDesk.getState().immersive);
-        return;
-      }
       if ((e.key === "f" || e.key === "F") && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
         e.preventDefault();
         useDesk.getState().toggleChartFocus();
@@ -158,19 +49,7 @@ export function TerminalShell({ guest = false }: { guest?: boolean }) {
   const hideChrome = immersive || chartFocus;
 
   return (
-    <div
-      ref={rootRef}
-      className={cn("flex h-dvh flex-col overflow-hidden bg-bg text-fg", immersive && "desk-fs")}
-    >
-      <Toaster
-        theme="dark"
-        position="top-right"
-        toastOptions={{
-          className: "bg-elevated text-fg border-border font-mono text-xs rounded-none",
-        }}
-      />
-      <SettingsDialog />
-      <HeaderBar />
+    <>
       {chartFocus ? null : <TickerTape />}
       {desktop ? (
         <DesktopLayout chartFocus={chartFocus} />
@@ -182,7 +61,7 @@ export function TerminalShell({ guest = false }: { guest?: boolean }) {
           hideNav={hideChrome}
         />
       )}
-    </div>
+    </>
   );
 }
 
