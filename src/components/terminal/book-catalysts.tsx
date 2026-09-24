@@ -17,7 +17,7 @@ export function BookCatalysts({
     <section className="shrink-0 border-t border-border bg-surface px-3 py-2">
       <div className="flex items-baseline gap-2">
         <p className="font-mono text-micro tracking-widest text-subtle uppercase">
-          Catalysts · {rows.length} next 14d
+          Catalysts · {rows.length} in 14d
         </p>
         {sim ? (
           <p className="font-mono text-micro tracking-widest text-muted uppercase">Sim</p>
