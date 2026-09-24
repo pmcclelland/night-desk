@@ -6,9 +6,11 @@ import {
   type BookThesis,
   type Conviction,
 } from "@/lib/book-view";
+import { toConcentrationSnapshot } from "@/lib/book-concentration";
 import { money, pct, px, qty, signClass, signedMoney } from "@/lib/format";
 import { isTypingTarget } from "@/lib/keys";
 import { selectSymbol } from "@/lib/desk-sync";
+import { BookConcentration } from "@/components/terminal/book-concentration";
 import { BookCurvePanel } from "@/components/terminal/book-curve";
 import { BookJournal } from "@/components/terminal/book-journal";
 import {
@@ -224,6 +226,16 @@ export function BookReview() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- orders snapshotted via orderKey
   }, [curveRange, useAlpacaCurve, orderKey]);
+
+  const concentration = useMemo(
+    () =>
+      toConcentrationSnapshot({
+        equity: view.equity,
+        cash: view.cash,
+        positions: view.positions.map((p) => ({ symbol: p.symbol, marketValue: p.marketValue })),
+      }),
+    [view.cash, view.equity, view.positions],
+  );
 
   const journalRows: JournalRow[] = useMemo(
     () =>
@@ -494,6 +506,7 @@ export function BookReview() {
           setExpanded(null);
         }}
       />
+      <BookConcentration snap={concentration} sim={simJournal} />
       </div>
       <p className="shrink-0 border-t border-border px-3 py-2 font-mono text-micro tracking-widest text-subtle uppercase">
         j k move · enter thesis · r range · g trade · p desk
