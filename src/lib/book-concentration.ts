@@ -72,6 +72,15 @@ export function barWidthPct(value: number) {
   return Math.min(100, Math.max(0, Math.abs(value)));
 }
 
+export function formatSharePct(value: number) {
+  if (!Number.isFinite(value)) return "—";
+  return `${value.toFixed(1)}%`;
+}
+
+export function visibleSectors(sectors: ConcentrationSector[]) {
+  return sectors.filter((row) => row.sector !== OTHER_SECTOR || Math.abs(row.marketValue) > 0);
+}
+
 function byAbsValueThenName<T extends { marketValue: number }>(
   a: T,
   b: T,
@@ -98,13 +107,13 @@ export function toConcentrationSnapshot(input: {
     const sector = sectorOf(p.symbol);
     bySector.set(sector, (bySector.get(sector) ?? 0) + p.marketValue);
   }
-  const sectors = [...bySector.entries()]
-    .map(([sector, marketValue]) => ({
+  const sectors = visibleSectors(
+    [...bySector.entries()].map(([sector, marketValue]) => ({
       sector,
       marketValue,
       sharePct: sharePct(marketValue, input.equity),
-    }))
-    .sort((a, b) => byAbsValueThenName(a, b, (row) => row.sector));
+    })),
+  ).sort((a, b) => byAbsValueThenName(a, b, (row) => row.sector));
 
   return {
     top5,

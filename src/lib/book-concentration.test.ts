@@ -4,9 +4,11 @@ import {
   OTHER_SECTOR,
   TOP_N,
   barWidthPct,
+  formatSharePct,
   sectorOf,
   sharePct,
   toConcentrationSnapshot,
+  visibleSectors,
 } from "./book-concentration.ts";
 
 describe("book-concentration", () => {
@@ -90,6 +92,32 @@ describe("book-concentration", () => {
     assert.equal(snap.top5[0]?.symbol, "TSLA");
     assert.equal(snap.top5[0]?.sharePct, -25);
     assert.equal(snap.top5SharePct, -7);
+  });
+
+  it("formats shares to one decimal without a sign", () => {
+    assert.equal(formatSharePct(49.09), "49.1%");
+    assert.equal(formatSharePct(46.5), "46.5%");
+    assert.equal(formatSharePct(4), "4.0%");
+    assert.equal(formatSharePct(Number.NaN), "—");
+  });
+
+  it("omits Other when every name is mapped", () => {
+    const snap = toConcentrationSnapshot({
+      equity: 100_000,
+      cash: 50_000,
+      positions: [
+        { symbol: "AAPL", marketValue: 30_000 },
+        { symbol: "SPY", marketValue: 20_000 },
+      ],
+    });
+    assert.equal(
+      snap.sectors.some((s) => s.sector === OTHER_SECTOR),
+      false,
+    );
+    assert.deepEqual(
+      visibleSectors([{ sector: OTHER_SECTOR, marketValue: 0, sharePct: 0 }]),
+      [],
+    );
   });
 
   it("puts unmapped tickers in Other", () => {

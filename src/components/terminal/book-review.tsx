@@ -378,8 +378,6 @@ export function BookReview() {
 
       <SignalsPanel symbols={symbols} signals={signals} />
 
-      <BookConcentration snap={concentration} sim={simJournal} />
-
       <div className="min-h-0 flex-1 overflow-auto">
       {view.positions.length === 0 ? (
         <div className="flex items-center justify-center px-4 py-8 font-mono text-micro tracking-widest text-subtle uppercase">
@@ -508,6 +506,7 @@ export function BookReview() {
           setExpanded(null);
         }}
       />
+      <BookConcentration snap={concentration} sim={simJournal} />
       </div>
       <p className="shrink-0 border-t border-border px-3 py-2 font-mono text-micro tracking-widest text-subtle uppercase">
         j k move · enter thesis · r range · g trade · p desk
