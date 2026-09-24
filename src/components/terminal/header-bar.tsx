@@ -28,7 +28,6 @@ export function HeaderBar() {
   const now = useNow(1000);
   const clock = now ? getMarketClock(now) : null;
   const venue = useDesk(selectVenue);
-  const guestDemo = useDesk((s) => s.guestDemo);
   const halted = useDesk((s) => s.halted);
   const tapeSource = useDesk((s) => s.tapeSource);
   const immersive = useDesk((s) => s.immersive);
@@ -45,9 +44,9 @@ export function HeaderBar() {
 
   return (
     <header className="flex h-11 shrink-0 items-center gap-2 border-b border-border bg-bg px-2 md:h-10 md:px-3">
-      <div className="flex min-w-0 items-center gap-2">
+      <div className="flex shrink-0 items-center gap-2">
         <span className="font-mono text-xs font-medium tracking-widest text-accent">NIGHTDESK</span>
-        <nav className="flex items-center gap-1 font-mono text-micro tracking-widest uppercase">
+        <nav className="flex shrink-0 items-center gap-1 font-mono text-micro tracking-widest uppercase">
           <Link
             to="/"
             title="Trade (P)"
@@ -68,7 +67,7 @@ export function HeaderBar() {
           className={cn(
             "font-mono text-micro tracking-widest uppercase",
             venue === "alpaca-live" ? "text-down" : "text-muted",
-            !guestDemo && "hidden md:inline",
+            "hidden md:inline",
           )}
         >
           {VENUE[venue]}
@@ -78,7 +77,7 @@ export function HeaderBar() {
           className={cn(
             "font-mono text-micro tracking-widest uppercase",
             tapeWarn ? "text-down" : "text-subtle",
-            !guestDemo && "hidden md:inline",
+            "hidden md:inline",
           )}
         >
           {tape.label}
