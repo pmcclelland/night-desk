@@ -1,10 +1,14 @@
 import { createServerFn } from "@tanstack/react-start";
 import { authMiddleware } from "@/lib/auth/middleware";
 import type { BookThesis } from "@/lib/book-view";
+import { barsToPoints } from "@/lib/book-curve";
 import { executeDeskOp, type DeskOp } from "@/lib/server/desk-engine";
 import { captureAlpacaBook } from "@/lib/server/desk-ledger";
 import { deleteDeskKv, getDeskKv, listDeskKv, putDeskKv } from "@/lib/server/desk-kv";
 import { claimOwner, loadDesk, publicDesk, requireOwner, type DeskSnapshot } from "@/lib/server/desk-store";
+import { fetchEquityHistoryInner } from "@/lib/server/alpaca";
+import { loadCurveBars } from "@/lib/server/market";
+import type { CurveRange, EquityPoint } from "@/lib/types";
 import { createMcpToken, listMcpTokens, revokeMcpToken } from "@/lib/server/mcp-token.server";
 import {
   mergeThesisWrite,
@@ -114,4 +118,24 @@ export const putThesis = createServerFn({ method: "POST" })
     const thesis = mergeThesisWrite(existing, data);
     await putDeskKv(context.userId, "thesis", key, thesis);
     return { thesis };
+  });
+
+export const fetchOwnerBookCurve = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: { range: CurveRange }) => input)
+  .handler(async ({ context, data }) => {
+    await requireOwner(context.userId);
+    const desk = await loadDesk(context.userId);
+    const creds = desk.creds;
+    if (desk.venue === "sim" || !creds?.keyId || !creds.secret) {
+      return { book: [] as EquityPoint[], spy: [] as EquityPoint[], usedAlpaca: false };
+    }
+    const book = await fetchEquityHistoryInner(desk.venue, creds, data.range);
+    const spyBars = await loadCurveBars({
+      symbol: "SPY",
+      range: data.range,
+      venue: desk.venue,
+      creds,
+    });
+    return { book, spy: barsToPoints(spyBars.bars), usedAlpaca: true };
   });

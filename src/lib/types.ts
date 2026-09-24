@@ -6,6 +6,8 @@ export type BarSource = "alpaca" | "yahoo" | "seed";
 
 export type BarRange = "1D" | "5D" | "1M" | "6M" | "1Y";
 
+export type CurveRange = "1W" | "1M" | "3M";
+
 export type ChartMode = "candles" | "line";
 
 export type OrderSide = "buy" | "sell";

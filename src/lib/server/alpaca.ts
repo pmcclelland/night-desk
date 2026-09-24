@@ -1,4 +1,4 @@
-import type { Account, Creds, EquityPoint, Order, Position, Venue } from "@/lib/types";
+import type { Account, Creds, CurveRange, EquityPoint, Order, Position, Venue } from "@/lib/types";
 
 function host(venue: Venue) {
   return venue === "alpaca-live" ? "https://api.alpaca.markets" : "https://paper-api.alpaca.markets";
@@ -239,12 +239,16 @@ export async function closeAllAlpacaInner(venue: Venue, creds: Creds) {
   }
 }
 
-export async function fetchEquityHistoryInner(venue: Venue, creds: Creds): Promise<EquityPoint[]> {
+export async function fetchEquityHistoryInner(
+  venue: Venue,
+  creds: Creds,
+  period: CurveRange = "1M",
+): Promise<EquityPoint[]> {
   try {
     const body = await alpaca<{ timestamp: number[]; equity: Array<number | null> }>(
       venue,
       creds,
-      "/v2/account/portfolio/history?period=1M&timeframe=1D",
+      `/v2/account/portfolio/history?period=${period}&timeframe=1D`,
     );
     const pts: EquityPoint[] = [];
     for (let i = 0; i < (body.timestamp?.length ?? 0); i++) {

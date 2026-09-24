@@ -1,9 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { clipBarsForRange, rangeWindow } from "@/lib/bar-window";
+import { curveWindow } from "@/lib/book-curve";
 import { loadDesk } from "@/lib/server/desk-store";
 import { nameOf, SEED } from "@/lib/universe";
-import type { Bar, BarRange, BarSource, Creds, Quote, TapeSource, Venue } from "@/lib/types";
+import type { Bar, BarRange, BarSource, Creds, CurveRange, Quote, TapeSource, Venue } from "@/lib/types";
 
 const UA = "Mozilla/5.0 (compatible; NightDesk/1.0; +https://x.ai)";
 
@@ -13,6 +14,12 @@ const RANGE: Record<BarRange, { range: string; interval: string; alpaca: string 
   "1M": { range: "1mo", interval: "1d", alpaca: "1Day" },
   "6M": { range: "6mo", interval: "1d", alpaca: "1Day" },
   "1Y": { range: "1y", interval: "1d", alpaca: "1Day" },
+};
+
+const CURVE_YAHOO: Record<CurveRange, { range: string; interval: string }> = {
+  "1W": { range: "5d", interval: "1d" },
+  "1M": { range: "1mo", interval: "1d" },
+  "3M": { range: "3mo", interval: "1d" },
 };
 
 async function getJson(url: string, headers: Record<string, string>, ms = 8000) {
@@ -399,3 +406,109 @@ export const fetchBars = createServerFn({ method: "POST" })
 export const fetchPublicBars = createServerFn({ method: "POST" })
   .validator((input: { symbol: string; range: BarRange }) => input)
   .handler(async ({ data }) => loadBars({ symbol: data.symbol, range: data.range, venue: "sim" }));
+
+function syntheticCurveBars(symbol: string, range: CurveRange, now: number): Bar[] {
+  const seed = SEED[symbol]?.last ?? 100;
+  const n = range === "1W" ? 5 : range === "1M" ? 22 : 66;
+  const step = 24 * 60 * 60_000;
+  const bars: Bar[] = [];
+  let px = seed * 0.97;
+  for (let i = 0; i < n; i++) {
+    const drift = (seed - px) * 0.04;
+    const shock = Math.sin(i * 0.45 + symbol.length) * seed * 0.004;
+    const o = px;
+    const c = px + drift + shock;
+    const h = Math.max(o, c) + seed * 0.002;
+    const l = Math.min(o, c) - seed * 0.002;
+    bars.push({ t: now - (n - i) * step, o, h, l, c, v: 1_000_000 + i * 1200 });
+    px = c;
+  }
+  return bars;
+}
+
+async function yahooCurveBars(symbol: string, range: CurveRange): Promise<Bar[]> {
+  const spec = CURVE_YAHOO[range];
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=${spec.interval}&range=${spec.range}`;
+  const body = (await getJson(url, { "User-Agent": UA })) as YahooChart;
+  return barsFromYahoo(body);
+}
+
+async function alpacaCurveBars(symbol: string, range: CurveRange, creds: Creds): Promise<Bar[] | null> {
+  try {
+    const { start, end } = curveWindow(range);
+    const collected: Bar[] = [];
+    let page: string | undefined;
+    for (let i = 0; i < 5; i++) {
+      const params = new URLSearchParams({
+        timeframe: "1Day",
+        start,
+        end,
+        limit: "10000",
+        adjustment: "split",
+        feed: "iex",
+        sort: "asc",
+      });
+      if (page) params.set("page_token", page);
+      const url = `https://data.alpaca.markets/v2/stocks/${encodeURIComponent(symbol)}/bars?${params}`;
+      const body = (await getJson(url, alpacaHeaders(creds))) as {
+        bars?: Array<{ t: string; o: number; h: number; l: number; c: number; v: number }>;
+        next_page_token?: string | null;
+      };
+      for (const b of body.bars ?? []) {
+        collected.push({
+          t: Date.parse(b.t),
+          o: Number(b.o),
+          h: Number(b.h),
+          l: Number(b.l),
+          c: Number(b.c),
+          v: Number(b.v),
+        });
+      }
+      if (!body.next_page_token) break;
+      page = body.next_page_token;
+    }
+    return collected.length ? collected : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function loadCurveBars(data: {
+  symbol: string;
+  range: CurveRange;
+  venue: Venue;
+  creds?: Creds | null;
+}): Promise<{ bars: Bar[]; source: BarSource }> {
+  const symbol = data.symbol.toUpperCase();
+  if ((data.venue === "alpaca-paper" || data.venue === "alpaca-live") && usableCreds(data.creds)) {
+    const live = await alpacaCurveBars(symbol, data.range, usableCreds(data.creds)!);
+    if (live) return { bars: live, source: "alpaca" };
+  }
+  try {
+    const bars = await yahooCurveBars(symbol, data.range);
+    if (bars.length) return { bars, source: "yahoo" };
+  } catch {
+    /* seed */
+  }
+  return { bars: syntheticCurveBars(symbol, data.range, Date.now()), source: "seed" };
+}
+
+/** Daily closes for the SIM/guest book curve. Never reads Alpaca keys or a desk row. */
+export const fetchPublicCurveSeries = createServerFn({ method: "POST" })
+  .validator((input: { symbols: string[]; range: CurveRange }) => input)
+  .handler(async ({ data }) => {
+    const symbols = [...new Set(data.symbols.map((s) => s.toUpperCase()).filter(Boolean))];
+    const entries = await Promise.all(
+      symbols.map(async (symbol) => {
+        const { bars, source } = await loadCurveBars({ symbol, range: data.range, venue: "sim" });
+        return { symbol, bars, source };
+      }),
+    );
+    const series: Record<string, Bar[]> = {};
+    let source: BarSource = "seed";
+    for (const row of entries) {
+      series[row.symbol] = row.bars;
+      if (row.source === "yahoo") source = "yahoo";
+    }
+    return { series, source };
+  });
