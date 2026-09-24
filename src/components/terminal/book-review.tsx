@@ -6,9 +6,11 @@ import {
   type BookThesis,
   type Conviction,
 } from "@/lib/book-view";
+import { toConcentrationSnapshot } from "@/lib/book-concentration";
 import { money, pct, px, qty, signClass, signedMoney } from "@/lib/format";
 import { isTypingTarget } from "@/lib/keys";
 import { selectSymbol } from "@/lib/desk-sync";
+import { BookConcentration } from "@/components/terminal/book-concentration";
 import { BookCurvePanel } from "@/components/terminal/book-curve";
 import { BookJournal } from "@/components/terminal/book-journal";
 import {
@@ -225,6 +227,16 @@ export function BookReview() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- orders snapshotted via orderKey
   }, [curveRange, useAlpacaCurve, orderKey]);
 
+  const concentration = useMemo(
+    () =>
+      toConcentrationSnapshot({
+        equity: view.equity,
+        cash: view.cash,
+        positions: view.positions.map((p) => ({ symbol: p.symbol, marketValue: p.marketValue })),
+      }),
+    [view.cash, view.equity, view.positions],
+  );
+
   const journalRows: JournalRow[] = useMemo(
     () =>
       attachJournalThesis(capJournal(clipJournal(buildRoundTrips(journalFills), curveRange)), theses),
@@ -365,6 +377,8 @@ export function BookReview() {
       <BookCurvePanel range={curveRange} onRange={setCurveRange} snap={curve} loading={curveLoading} />
 
       <SignalsPanel symbols={symbols} signals={signals} />
+
+      <BookConcentration snap={concentration} sim={simJournal} />
 
       <div className="min-h-0 flex-1 overflow-auto">
       {view.positions.length === 0 ? (
