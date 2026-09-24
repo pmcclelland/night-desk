@@ -389,11 +389,11 @@ function SignalsPanel({
           {symbols.length === 0 ? (
             <p className="mt-2 font-mono text-2xs text-subtle">No held names</p>
           ) : (
-            <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">
+            <ul className="mt-2 grid gap-x-4 gap-y-1 sm:grid-cols-2">
               {symbols.map((sym) => {
                 const row = signals.byTicker[sym];
                 return (
-                  <li key={sym} className="min-w-0 font-mono text-2xs">
+                  <li key={sym} className="min-w-0 truncate font-mono text-2xs">
                     <span className="text-fg">{sym}</span>
                     {row ? (
                       <span className="text-muted">
