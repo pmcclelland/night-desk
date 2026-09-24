@@ -35,9 +35,9 @@ The loop and hydrate live in `TerminalShell` today (`startLiveLoop` / `stopLiveL
 
 **Carries across** (already in `useDesk`, `src/lib/store.ts`): `selected`, venue, `liveFeed`, guest overlay, quotes, SIM/Alpaca book, settings.
 
-**Shared:** `AuthProvider` (`src/routes/__root.tsx`), owner gate, `useDesk`, header EQ/CASH/DAY, settings, `refreshQuotes` / `refreshAlpaca` / `hydrateDesk`, SNAP/LIVE, guest SIM lock (`src/lib/tape-gate.ts`).
+**Shared:** `AuthProvider` (`src/routes/__root.tsx`), owner gate, `useDesk`, header EQ/CASH/DAY, settings, `refreshQuotes` / `refreshAlpaca` / `hydrateDesk`, SNAP/LIVE, guest SIM lock (`src/lib/tape-gate.ts`). Header shows **TRADE | REVIEW** and **`P`** toggles the two routes (ignored while typing).
 
-**Separate:** body layout, review keyboard, no tape / chart / ticket / algos / bot on `/review`. Jumping a name calls `selectSymbol` (`src/lib/desk-sync.ts`) and navigates to `/`.
+**Separate:** body layout, review keyboard (`j`/`k`/arrows, Enter, `G`, Esc), no tape / chart / ticket / algos / bot on `/review`. `G` calls `selectSymbol` (`src/lib/desk-sync.ts`) and navigates to `/`.
 
 ## 2. Layout sketch
 
@@ -80,7 +80,7 @@ No colors or type here.
 
 Blotter (`blotter.tsx`) shows SYM, qty, avg, unrealized. It does not show weight, day P&L, or thesis.
 
-v1 of this view: open positions + book strip from `useLiveBook`. No invented curve, win rate, or closed-lot P&L.
+v1 of this view: **open positions only** + book strip from `useLiveBook`. Row shows qty, cost, weight, day P&L, total (unrealized) P&L, thesis one-liner. No curve, win rate, benchmark, or closed-lot P&L. Time window is **today / this snapshot**.
 
 ### Thesis
 
@@ -96,7 +96,7 @@ Current generated fields: `symbol`, last, trend, SMA20 stretch, RSI, 20-bar rang
 
 Add for the stored thesis: `reasoning`, `conviction`, `drivers`, `invalidation`, `target`, `asOf`, `lastReviewed`.
 
-Guest has no `desk_kv`. Guest notes stay in the persisted zustand blob, local to that browser, never Paul’s Alpaca, never the owner row.
+Guest has no `desk_kv`. Guest notes stay in the persisted zustand blob, local to that browser, never Paul’s Alpaca, never the owner row. Edit is **inline on `/review`**. Bot `THESIS` and the chart button stay the indicator one-liner and do not write `desk_kv`. Empty thesis stays empty — do not fill from `localThesis`.
 
 ```ts
 type Conviction = "high" | "medium" | "low";
@@ -142,8 +142,6 @@ interface BookPerformanceView {
 }
 ```
 
-Empty thesis is empty. Do not fill from `localThesis`.
-
 ## 4. Modes
 
 **Guest SIM** (`guestDemo`, `sessionVenue` / `sessionLiveFeed` in `tape-gate.ts`): forced SIM, seeded book (`createStarterBook`), public Yahoo via `fetchPublicQuotes`. Tape is forced LIVE. Never call Alpaca, `pullDesk`, or owner `desk_kv`.
@@ -158,28 +156,26 @@ A SNAP → LIVE flip in settings applies on both routes because the loop is shar
 
 ## 5. Build plan
 
-1. **Session hoist + `/review` shell.** Pathless `_desk` layout; move auth gate and the loop out of `TerminalShell`. Empty review body. Verify: `/` still desks; `/review` is its own screen; SNAP does not start a loop after boot; guest still public Yahoo; login still lands on `/`.
+1. **Session hoist + `/review` + mode chrome.** Pathless `_desk` layout owns auth, hydrate, SNAP/LIVE loop, header, settings. `/review` is its own view with a book table from `useLiveBook` (weight, day P&L, total P&L; thesis column empty until slice 2). `P` toggles `/` ↔ `/review`. Header TRADE | REVIEW. Review keys: `j`/`k`/arrows, Enter, `G`, Esc. Verify: quotes survive `P`; SNAP does not start a new loop; guest still public Yahoo and never hits Alpaca; `P` ignored in inputs; `F` / `Shift+F` / `/` unchanged on the desk.
 
-2. **Mode toggle.** `P` (see open questions) swaps `/` ↔ `/review`. Header TRADE | REVIEW. Verify: one keypress each way; ignored in INPUT/TEXTAREA/SELECT/contenteditable (same `isTypingTarget` as `F`); no-op on `/login`; `F` / `Shift+F` / `/` unchanged on the desk; `Shift+F` still works on `/review`.
+2. **Thesis persist.** Owner: `listDeskKv` / `putDeskKv` `ns=thesis`. Guest: local persist. Inline edit on `/review`. Verify: owner thesis survives reload; guest thesis does not hit Neon; empty names stay empty.
 
-3. **Performance rows.** Join `useLiveBook` into `BookPerformanceView`. Summary + rows. Verify: guest starter lots; signed-in SNAP shows the last snapshot only (network quiet after boot); LIVE marks when quotes move; narrow width stacks without a trading tab.
+## 6. Decisions (locked 2026-09-24)
 
-4. **Thesis + review keys.** Owner: `listDeskKv` / `putDeskKv` `ns=thesis`. Guest: local persist. Inline edit on `/review`. Keys below. Verify: owner thesis survives reload; guest thesis does not hit Neon; `G` lands on `/` with that `selected`; empty names stay empty.
+Paul approved all eight defaults.
 
-## 6. Open questions for Paul
+1. **Mode shortcut.** **`P`** toggles `/` ↔ `/review`. Existing keys stay: `F` chart focus, `Shift+F` fullscreen, `Esc` exit those, `/` focus bot (`shell.tsx`, `bot-console.tsx`). Ignore `P` when focus is in an input (same rule as `F`).
 
-1. **Mode shortcut.** Existing keys: `F` chart focus, `Shift+F` fullscreen, `Esc` exit those, `/` focus bot (`shell.tsx`, `bot-console.tsx`). `P` is free. Recommend **`P`** to toggle `/` ↔ `/review`. Ignore when focus is in an input (same rule as `F`).
+2. **Visible mode switcher.** **Yes:** TRADE | REVIEW in `HeaderBar` next to the word NIGHTDESK.
 
-2. **Visible mode switcher.** Recommend **yes**: TRADE | REVIEW in `HeaderBar` next to the word NIGHTDESK, so the mode is obvious without the key.
+3. **Which metrics on the row.** **Weight, day P&L, total (unrealized) P&L, thesis one-liner.** Qty and cost stay. No curve / win rate / benchmark in v1.
 
-3. **Which metrics on the row.** Recommend **weight, day P&L, total (unrealized) P&L, thesis one-liner.** Qty and cost stay. Skip curve / win rate / benchmark until asked.
+4. **Benchmark.** **None** in v1. No SPY series is loaded for the book.
 
-4. **Benchmark.** Recommend **none** in v1. No SPY series is loaded for the book.
+5. **Time window.** **Today / this snapshot only.** No 1W/1M book window without new storage or wiring `fetchEquityHistory`.
 
-5. **Time window.** Recommend **today / this snapshot only** — the numbers we already have. No 1W/1M book window without new storage or wiring `fetchEquityHistory`.
+6. **Where thesis is edited.** **Inline on `/review`**, owner persist via `desk_kv`. Bot `THESIS` and the chart button stay the indicator one-liner; they do not write `desk_kv`.
 
-6. **Where thesis is edited.** Recommend **inline on `/review`**, owner-only persist. Bot `THESIS` and the chart button stay the indicator one-liner; they do not write `desk_kv`.
+7. **Closed positions.** **Omit in v1.** SIM drops flat names; Alpaca `/v2/positions` is open risk; `desk_events` is write-only fills.
 
-7. **Closed positions.** Recommend **omit in v1.** SIM drops flat names; Alpaca `/v2/positions` is open risk; `desk_events` is write-only fills.
-
-8. **In-view keys on `/review`.** Recommend **`j`/`k` or arrows** move the row, **Enter** expand/collapse thesis, **`G`** (`selectSymbol` + `/`), **`P`** back to the desk. `Esc` collapses, then (second press) returns to `/`.
+8. **In-view keys on `/review`.** **`j`/`k` or arrows** move the row, **Enter** expand/collapse thesis, **`G`** (`selectSymbol` + `/`), **`P`** back to the desk. `Esc` collapses, then (second press) returns to `/`.
