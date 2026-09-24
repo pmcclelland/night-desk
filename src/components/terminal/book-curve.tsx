@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState, type MouseEvent, type T
 import {
   CURVE_RANGES,
   curvePlotScale,
-  curveTimeLabelPlacement,
+  layoutCurveTimeLabels,
   formatCurveAxis,
   type BookCurveSnapshot,
 } from "@/lib/book-curve";
@@ -212,29 +212,27 @@ function CurveSvg({ book, spy }: { book: EquityPoint[]; spy: EquityPoint[] }) {
             strokeLinejoin="round"
             strokeLinecap="round"
           />
-          {book.map((p, i) => {
-            if (i % layout.timeStep !== 0) return null;
-            const place = curveTimeLabelPlacement(
+          {layoutCurveTimeLabels(
+            layout.labeled.map((i) => ({
               i,
-              layout.labeled,
-              layout.xAt(i, layout.n),
-              layout.padL,
-              layout.plotW,
-              layout.w,
-            );
-            return (
-              <text
-                key={`t-${p.t}`}
-                x={place.x}
-                y={layout.h - 6}
-                textAnchor={place.anchor}
-                className="fill-subtle font-mono"
-                fontSize="10"
-              >
-                {barTime(p.t, false)}
-              </text>
-            );
-          })}
+              x: layout.xAt(i, layout.n),
+              text: barTime(book[i]!.t, false),
+            })),
+            layout.padL,
+            layout.plotW,
+            layout.w,
+          ).map((place) => (
+            <text
+              key={`t-${book[place.i]!.t}`}
+              x={place.x}
+              y={layout.h - 6}
+              textAnchor={place.anchor}
+              className="fill-subtle font-mono"
+              fontSize="10"
+            >
+              {place.text}
+            </text>
+          ))}
           {hover !== null && book[hover] ? (
             <>
               <line

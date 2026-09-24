@@ -7,6 +7,7 @@ import {
   nextCurveRange,
   curvePlotScale,
   curveTimeLabelPlacement,
+  layoutCurveTimeLabels,
   formatCurveAxis,
   rebaseToStart,
   reconstructSimCurve,
@@ -136,6 +137,37 @@ describe("book-curve", () => {
     const mid = curveTimeLabelPlacement(4, labeled, 80, 8, 200, 390);
     assert.equal(mid.anchor, "middle");
     assert.equal(mid.x, 80);
+  });
+
+  it("drops a narrow interior x label that crowds a pinned edge", () => {
+    const ticks = [
+      { i: 0, x: 20, text: "Aug 25" },
+      { i: 4, x: 48, text: "Aug 31" },
+      { i: 8, x: 120, text: "Sep 11" },
+      { i: 12, x: 190, text: "Sep 23" },
+    ];
+    const wide = layoutCurveTimeLabels(ticks, 8, 200, 800);
+    assert.equal(wide.length, 4);
+    assert.ok(wide.every((l) => l.anchor === "middle"));
+    const narrow = layoutCurveTimeLabels(ticks, 8, 200, 390);
+    assert.equal(narrow[0]?.text, "Aug 25");
+    assert.equal(narrow[0]?.anchor, "start");
+    assert.equal(narrow[narrow.length - 1]?.text, "Sep 23");
+    assert.equal(narrow[narrow.length - 1]?.anchor, "end");
+    assert.equal(narrow.some((l) => l.text === "Aug 31"), false);
+    assert.equal(narrow.some((l) => l.text === "Sep 11"), true);
+  });
+
+  it("drops a narrow interior x label that crowds the last pinned edge", () => {
+    const ticks = [
+      { i: 0, x: 20, text: "Aug 25" },
+      { i: 8, x: 120, text: "Sep 11" },
+      { i: 12, x: 175, text: "Sep 17" },
+      { i: 16, x: 190, text: "Sep 23" },
+    ];
+    const narrow = layoutCurveTimeLabels(ticks, 8, 200, 390);
+    assert.equal(narrow.some((l) => l.text === "Sep 17"), false);
+    assert.equal(narrow[narrow.length - 1]?.text, "Sep 23");
   });
 
   it("pads the plot after nicing so the series floor is not a gridline", () => {

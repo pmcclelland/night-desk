@@ -205,6 +205,14 @@ export function curvePlotScale(lo: number, hi: number) {
 
 /** Below Tailwind `sm`, pin the first/last x labels to the plot edges so they stay whole. */
 export const NARROW_CURVE_W = 640;
+export const CURVE_LABEL_MIN_GAP = 8;
+
+export type CurveTimeLabel = {
+  i: number;
+  x: number;
+  anchor: "start" | "middle" | "end";
+  text: string;
+};
 
 export function curveTimeLabelPlacement(
   i: number,
@@ -218,6 +226,51 @@ export function curveTimeLabelPlacement(
   if (i === labeled[0]) return { x: padL, anchor: "start" };
   if (i === labeled[labeled.length - 1]) return { x: padL + plotW, anchor: "end" };
   return { x, anchor: "middle" };
+}
+
+function curveTimeLabelWidth(text: string) {
+  return text.length * 6.2;
+}
+
+function curveTimeLabelBox(label: Pick<CurveTimeLabel, "x" | "anchor" | "text">) {
+  const w = curveTimeLabelWidth(label.text);
+  if (label.anchor === "start") return { left: label.x, right: label.x + w };
+  if (label.anchor === "end") return { left: label.x - w, right: label.x };
+  return { left: label.x - w / 2, right: label.x + w / 2 };
+}
+
+function boxGap(
+  a: { left: number; right: number },
+  b: { left: number; right: number },
+) {
+  if (a.right <= b.left) return b.left - a.right;
+  if (b.right <= a.left) return a.left - b.right;
+  return 0;
+}
+
+/** Pin edge labels on a narrow plot, then drop interiors that crowd them. Desktop keeps every tick. */
+export function layoutCurveTimeLabels(
+  ticks: Array<{ i: number; x: number; text: string }>,
+  padL: number,
+  plotW: number,
+  width: number,
+  minGap = CURVE_LABEL_MIN_GAP,
+): CurveTimeLabel[] {
+  const labeled = ticks.map((t) => t.i);
+  const placed: CurveTimeLabel[] = ticks.map((t) => ({
+    ...t,
+    ...curveTimeLabelPlacement(t.i, labeled, t.x, padL, plotW, width),
+  }));
+  if (width >= NARROW_CURVE_W || placed.length <= 2) return placed;
+  const first = placed[0]!;
+  const last = placed[placed.length - 1]!;
+  const firstBox = curveTimeLabelBox(first);
+  const lastBox = curveTimeLabelBox(last);
+  return placed.filter((label, idx) => {
+    if (idx === 0 || idx === placed.length - 1) return true;
+    const box = curveTimeLabelBox(label);
+    return boxGap(box, firstBox) >= minGap && boxGap(box, lastBox) >= minGap;
+  });
 }
 
 export function barsToPoints(bars: Bar[]): EquityPoint[] {
