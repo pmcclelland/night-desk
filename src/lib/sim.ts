@@ -105,6 +105,41 @@ export function deriveAccount(book: SimBook, quotes: Record<string, Quote>): Acc
   };
 }
 
+function filledOrder(
+  symbol: string,
+  side: Order["side"],
+  qty: number,
+  px: number,
+  t: number,
+): Order {
+  return {
+    id: `seed-${symbol}-${side}-${t}`,
+    clientOrderId: `seed-${symbol}-${side}-${t}`,
+    symbol,
+    side,
+    type: "market",
+    qty,
+    filledQty: qty,
+    tif: "day",
+    status: "filled",
+    submittedAt: t,
+    filledAt: t,
+    filledAvgPrice: px,
+    source: "manual",
+  };
+}
+
+/** Closed SIM round-trips so the guest journal is not an empty starter book. */
+function starterClosedOrders(now: number): Order[] {
+  const day = 86_400_000;
+  return [
+    filledOrder("AMD", "buy", 10, 440, now - 18 * day),
+    filledOrder("AMD", "sell", 10, 456, now - 4 * day),
+    filledOrder("NFLX", "buy", 25, 82, now - 12 * day),
+    filledOrder("NFLX", "sell", 25, 79.2, now - 3 * day),
+  ];
+}
+
 export function createStarterBook(now = Date.now()): SimBook {
   const quotes = quoteMapFromSeed(
     STARTER_LOTS.map((l) => l.symbol),
@@ -126,7 +161,7 @@ export function createStarterBook(now = Date.now()): SimBook {
     cash: STARTING_CASH - cost,
     realizedToday: 0,
     positions,
-    orders: [],
+    orders: starterClosedOrders(now),
     equityHistory: [],
   };
   const acct = deriveAccount(book, quotes);
