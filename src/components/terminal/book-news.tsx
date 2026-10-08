@@ -30,7 +30,7 @@ export function BookNews({
                 href={item.url}
                 target="_blank"
                 rel="noreferrer"
-                className="block min-w-0 text-sm leading-snug text-fg text-pretty hover:text-accent"
+                className="block min-w-0 text-sm leading-snug text-fg text-pretty no-underline visited:text-fg hover:text-fg"
               >
                 {item.title}
               </a>

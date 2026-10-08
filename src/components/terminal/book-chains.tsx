@@ -6,7 +6,11 @@ import {
   convictionPlain,
   directionPlain,
   evidencePlain,
+  formatVaultDate,
   humanizeSlug,
+  nextCheckInPlain,
+  softenShouting,
+  sourceTitle,
 } from "@/lib/review-copy";
 import {
   SIGNALS_NOT_CONNECTED,
@@ -87,73 +91,101 @@ export function BookChains({
 
 function ChainBlock({ row }: { row: BrainSignal }) {
   const title = row.mechanismTitle || humanizeSlug(row.mechanismSlug);
+  const summary = row.thesisSummary ? softenShouting(row.thesisSummary) : null;
+  const checkIn = nextCheckInPlain(row.checkpoints);
+  const stepCount = row.chain.length;
+  const sources = uniqueSources(row);
+
   return (
     <article className="min-w-0 border-t border-border/80 pt-4 first:border-t-0 first:pt-0">
       <h3 className="font-sans text-sm font-medium text-fg text-pretty">{title}</h3>
       <p className="mt-1 text-xs text-muted">
         {directionPlain(row.direction)} · {convictionPlain(row.convictionLabel)}
-        {row.asOf ? ` · as of ${row.asOf}` : ""}
+        {row.asOf ? ` · as of ${formatVaultDate(row.asOf.slice(0, 10)) ?? row.asOf}` : ""}
       </p>
-      {row.thesisSummary ? (
-        <p className="mt-2 text-sm leading-relaxed text-fg text-pretty">{row.thesisSummary}</p>
+      {summary ? (
+        <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-fg text-pretty">{summary}</p>
       ) : null}
+      {checkIn ? <p className="mt-2 text-xs leading-relaxed text-subtle">{checkIn}</p> : null}
 
-      {row.chain.length > 0 ? (
-        <ol className="mt-3 space-y-3">
-          {row.chain.map((step, i) => (
-            <li key={`${row.id}:${step.step}`} className="min-w-0">
-              {i > 0 ? (
-                <p className="mb-2 font-mono text-micro tracking-widest text-subtle uppercase">so</p>
-              ) : null}
-              <p className="text-sm leading-relaxed text-fg text-pretty">
-                <span className="mr-2 font-mono text-2xs text-subtle">{step.step}.</span>
-                {step.claim}
-              </p>
-              <p className="mt-1 text-xs text-muted">
-                {evidencePlain(step.evidenceStatus)}
-                {step.sourceRef ? ` · ${step.sourceRef}` : ""}
-              </p>
-              {step.keyQuote ? (
-                <p className="mt-1 text-xs leading-relaxed text-subtle text-pretty">“{step.keyQuote}”</p>
-              ) : null}
-            </li>
-          ))}
-        </ol>
-      ) : null}
-
-      {row.checkpoints.length > 0 ? (
-        <ul className="mt-3 space-y-1.5">
-          {row.checkpoints.map((cp, i) => (
-            <li key={`${row.id}:cp:${i}`} className="text-xs leading-relaxed text-muted text-pretty">
-              <span className="text-fg">{checkpointKindPlain(cp.kind)}</span>
-              {cp.date ? ` · ${cp.date}` : ""}
-              {cp.label ? ` — ${cp.label}` : ""}
-            </li>
-          ))}
-        </ul>
-      ) : null}
-
-      {row.contradictions.length > 0 ? (
-        <p className="mt-3 text-xs leading-relaxed text-muted text-pretty">
-          What could be wrong: {row.contradictions.join("; ")}
-        </p>
-      ) : null}
-
-      {row.sourceRefs.length > 0 ? (
-        <ul className="mt-3 space-y-1">
-          {row.sourceRefs.slice(0, 4).map((ref) => (
-            <li key={ref} className="truncate text-xs text-subtle">
-              {ref.startsWith("http") ? (
-                <a href={ref} target="_blank" rel="noreferrer" className="hover:text-accent">
-                  {ref}
-                </a>
-              ) : (
-                ref
-              )}
-            </li>
-          ))}
-        </ul>
-      ) : null}
+      {stepCount > 0 ? (
+        <details className="mt-3">
+          <summary className="min-h-11 cursor-pointer text-xs text-subtle hover:text-fg sm:min-h-0 sm:py-1">
+            Show the reasoning ({stepCount} {stepCount === 1 ? "step" : "steps"})
+          </summary>
+          <ol className="mt-3 space-y-3">
+            {row.chain.map((step) => (
+              <li key={`${row.id}:${step.step}`} className="min-w-0">
+                <p className="text-sm leading-relaxed text-fg text-pretty">
+                  <span className="mr-2 font-mono text-2xs text-subtle">{step.step}.</span>
+                  {softenShouting(step.claim)}
+                </p>
+                <p className="mt-1 text-xs text-muted">{evidencePlain(step.evidenceStatus)}</p>
+                {step.keyQuote ? (
+                  <p className="mt-1 text-xs leading-relaxed text-subtle text-pretty">
+                    “{softenShouting(step.keyQuote)}”
+                  </p>
+                ) : null}
+              </li>
+            ))}
+          </ol>
+          {row.checkpoints.length > 0 ? (
+            <ul className="mt-3 space-y-1.5">
+              {row.checkpoints.map((cp, i) => (
+                <li key={`${row.id}:cp:${i}`} className="text-xs leading-relaxed text-muted text-pretty">
+                  <span className="text-fg">{checkpointKindPlain(cp.kind)}</span>
+                  {cp.date ? ` · ${formatVaultDate(cp.date) ?? cp.date}` : ""}
+                  {cp.label ? ` — ${cp.label}` : ""}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {row.contradictions.length > 0 ? (
+            <p className="mt-3 text-xs leading-relaxed text-muted text-pretty">
+              What could be wrong: {row.contradictions.join("; ")}
+            </p>
+          ) : null}
+          <SourceList refs={sources} />
+        </details>
+      ) : (
+        <SourceList refs={sources} />
+      )}
     </article>
+  );
+}
+
+function uniqueSources(row: BrainSignal): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const ref of [...row.sourceRefs, ...row.chain.map((s) => s.sourceRef).filter((r): r is string => Boolean(r))]) {
+    if (seen.has(ref)) continue;
+    seen.add(ref);
+    out.push(ref);
+  }
+  return out;
+}
+
+function SourceList({ refs }: { refs: string[] }) {
+  if (refs.length === 0) return null;
+  const label = refs.length === 1 ? "1 source" : `${refs.length} sources`;
+  return (
+    <details className="mt-3">
+      <summary className="min-h-11 cursor-pointer text-xs text-subtle hover:text-fg sm:min-h-0 sm:py-1">
+        {label}
+      </summary>
+      <ul className="mt-2 space-y-1">
+        {refs.map((ref) => (
+          <li key={ref} className="text-xs leading-relaxed text-muted text-pretty">
+            {ref.startsWith("http") ? (
+              <a href={ref} target="_blank" rel="noreferrer" className="text-muted hover:text-fg">
+                {sourceTitle(ref)}
+              </a>
+            ) : (
+              sourceTitle(ref)
+            )}
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }

@@ -19,15 +19,15 @@ export function ReviewCard({
   bodyClassName?: string;
 }) {
   return (
-    <section className={cn("flex min-h-0 flex-col rounded-lg border border-border bg-surface p-4", className)}>
-      <header className="mb-3 flex items-start justify-between gap-3">
+    <section className={cn("rounded-lg border border-border bg-surface p-4", className)}>
+      <header className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
         <div className="min-w-0">
           <h2 className="font-sans text-sm font-medium tracking-tight text-fg text-balance">{title}</h2>
           {dek ? <p className="mt-1 text-xs leading-relaxed text-muted text-pretty">{dek}</p> : null}
         </div>
-        {action ? <div className="shrink-0">{action}</div> : null}
+        {action ? <div className="shrink-0 self-start">{action}</div> : null}
       </header>
-      <div className={cn("min-h-0 flex-1", bodyClassName)}>{children}</div>
+      <div className={cn("min-w-0", bodyClassName)}>{children}</div>
       {hint ? <p className="mt-3 text-xs leading-relaxed text-subtle text-pretty">{hint}</p> : null}
     </section>
   );

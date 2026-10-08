@@ -9,9 +9,13 @@ import {
   directionPlain,
   evidencePlain,
   formatPoints,
+  formatVaultDate,
   humanizeSlug,
   journalSidePlain,
   newsAgo,
+  nextCheckInPlain,
+  softenShouting,
+  sourceTitle,
   thesisAgePlain,
 } from "./review-copy.ts";
 
@@ -50,10 +54,31 @@ describe("review-copy", () => {
     assert.equal(checkpointKindPlain("break"), "Would break it");
     assert.equal(catalystKindPlain("exdiv"), "Ex-dividend");
     assert.equal(journalSidePlain("long"), "Bought, then sold");
-    assert.equal(humanizeSlug("cuda-inference-premium"), "Cuda Inference Premium");
+    assert.equal(humanizeSlug("cuda-inference-premium"), "CUDA Inference Premium");
     assert.equal(thesisAgePlain(40, true), "Needs a fresh look (over 30 days old)");
     assert.equal(thesisAgePlain(5, false), "Written 5 days ago");
     assert.equal(formatPoints(-1.14), "1.1");
+  });
+
+  it("turns shouty vault labels into sentence case", () => {
+    assert.equal(
+      softenShouting("CONVICTION DOWNGRADED: Jensen Huang on Q1 FY2027"),
+      "Conviction downgraded: Jensen Huang on Q1 FY2027",
+    );
+    assert.match(softenShouting("CUDA becomes less load-bearing"), /CUDA/);
+  });
+
+  it("formats partial vault dates and source slugs", () => {
+    assert.equal(formatVaultDate("2026-08-XX"), "Aug 2026");
+    assert.equal(formatVaultDate("2026-08-21"), "Aug 21, 2026");
+    assert.equal(
+      sourceTitle("2026-07-06-feed-semianalysis-nvidia-gpu-debt-backstop-unleashes-the-ai-project-trinity-ca"),
+      "Semianalysis Nvidia GPU Debt Backstop Unleashes the AI Project Trinity",
+    );
+    assert.equal(
+      nextCheckInPlain([{ kind: "next", date: "2026-08-XX", label: "10-Q" }]),
+      "Next check-in · Aug 2026 — 10-Q",
+    );
   });
 
   it("formats news age from a timestamp", () => {

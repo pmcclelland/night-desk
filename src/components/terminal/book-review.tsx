@@ -54,6 +54,8 @@ import type { NewsItem } from "@/lib/news";
 import {
   convictionPlain,
   directionPlain,
+  nextCheckInPlain,
+  softenShouting,
   thesisAgePlain,
 } from "@/lib/review-copy";
 import type { CurveRange } from "@/lib/types";
@@ -482,13 +484,9 @@ export function BookReview() {
           </p>
         </header>
 
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <div className="lg:col-span-2">
+        <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
+          <div className="flex flex-col gap-4 lg:col-span-2">
             <BookCurvePanel range={curveRange} onRange={setCurveRange} snap={curve} loading={curveLoading} />
-          </div>
-          <BookConcentration snap={concentration} sim={simJournal} />
-
-          <div className="lg:col-span-2">
             <ReviewCard
               title="Holdings"
               dek="What you own, how much of the book it is, and why you still hold it."
@@ -539,9 +537,15 @@ export function BookReview() {
                               {signedMoney(p.dayPl)} {pct(p.dayPlPct)}
                             </span>
                           </p>
-                          <p className="mt-2 min-w-0 truncate text-xs leading-relaxed text-subtle">
-                            {p.thesis?.reasoning || "No note yet on why this is in the book."}
-                          </p>
+                          {p.thesis?.reasoning ? (
+                            <p className="mt-2 min-w-0 truncate text-xs leading-relaxed text-subtle">
+                              {p.thesis.reasoning}
+                            </p>
+                          ) : active ? (
+                            <p className="mt-2 text-xs leading-relaxed text-subtle">
+                              No note yet · Enter to add
+                            </p>
+                          ) : null}
                           {p.health ? (
                             <p className={cn("mt-1 text-xs", p.health.stale ? "text-down" : "text-subtle")}>
                               {thesisAgePlain(p.health.ageDays, p.health.stale)}
@@ -568,6 +572,7 @@ export function BookReview() {
           </div>
 
           <div className="flex flex-col gap-4">
+            <BookConcentration snap={concentration} sim={simJournal} />
             <SignalsPanel symbols={symbols} signals={signals} />
             <BookChains
               ticker={chainTicker}
@@ -575,11 +580,8 @@ export function BookReview() {
               signals={signals}
               onPick={pickTicker}
             />
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 lg:col-span-3 lg:grid-cols-2">
-            <BookNews items={news} loading={newsLoading} failed={newsFailed} />
             <BookCatalysts rows={catalysts} loading={catalystLoading} sim={simJournal} />
+            <BookNews items={news} loading={newsLoading} failed={newsFailed} />
           </div>
           <div className="lg:col-span-3">
             <BookJournal
@@ -595,7 +597,7 @@ export function BookReview() {
           </div>
         </div>
 
-        <p className="mt-6 max-w-3xl text-xs leading-relaxed text-subtle text-pretty">
+        <p className="mt-6 hidden max-w-3xl text-xs leading-relaxed text-subtle text-pretty sm:block">
           j / k move between names and closed trades · Enter opens your note · r changes the
           time window · g opens that name on Trade · P returns to the desk.
         </p>
@@ -641,16 +643,25 @@ function SignalsPanel({
                   {named.map((sym) => {
                     const row = signals.byTicker[sym];
                     if (!row) return null;
+                    const summary = row.thesisSummary ? softenShouting(row.thesisSummary) : null;
+                    const checkIn = nextCheckInPlain(row.checkpoints);
                     return (
                       <li key={sym} className="min-w-0">
                         <p className="text-sm text-fg">
                           {nameOf(sym)}{" "}
                           <span className="font-mono text-2xs text-muted">{sym}</span>
                         </p>
-                        <p className="mt-1 text-xs leading-relaxed text-muted text-pretty">
+                        <p className="mt-1 text-xs leading-relaxed text-muted">
                           {directionPlain(row.direction)} · {convictionPlain(row.convictionLabel)}
-                          {row.thesisSummary ? ` — ${row.thesisSummary}` : ""}
                         </p>
+                        {summary ? (
+                          <p className="mt-1 line-clamp-3 text-sm leading-relaxed text-fg text-pretty">
+                            {summary}
+                          </p>
+                        ) : null}
+                        {checkIn ? (
+                          <p className="mt-1 text-xs leading-relaxed text-subtle">{checkIn}</p>
+                        ) : null}
                       </li>
                     );
                   })}
