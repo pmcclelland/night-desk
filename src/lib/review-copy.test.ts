@@ -79,6 +79,16 @@ describe("review-copy", () => {
       nextCheckInPlain([{ kind: "next", date: "2026-08-XX", label: "10-Q" }]),
       "Next check-in · Aug 2026 — 10-Q",
     );
+    assert.equal(
+      nextCheckInPlain([
+        {
+          kind: "next",
+          date: "2026-08-XX",
+          label: "Nvidia discloses backstop contingent liabilities or take-rate economics in a 10-Q/10-K",
+        },
+      ]),
+      "Next check-in · Aug 2026",
+    );
   });
 
   it("formats news age from a timestamp", () => {

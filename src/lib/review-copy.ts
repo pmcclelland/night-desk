@@ -249,10 +249,15 @@ export function nextCheckInPlain(
   const next = checkpoints.find((c) => c.kind === "next") ?? checkpoints.find((c) => c.date) ?? null;
   if (!next) return null;
   const when = formatVaultDate(next.date);
-  const label = next.label?.trim() || null;
+  const raw = next.label?.trim() || null;
+  const label = raw && raw.length <= 36 ? raw : null;
   if (when && label) return `Next check-in · ${when} — ${label}`;
   if (when) return `Next check-in · ${when}`;
-  if (label) return `Next check-in · ${label}`;
+  if (raw) {
+    const clipped = raw.split(/[.(]/)[0]!.trim();
+    const short = clipped.length <= 36 ? clipped : `${clipped.slice(0, 33).trimEnd()}…`;
+    return `Next check-in · ${short}`;
+  }
   return "Next check-in";
 }
 
