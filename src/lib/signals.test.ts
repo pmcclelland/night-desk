@@ -4,8 +4,11 @@ import {
   SIGNALS_NOT_CONNECTED,
   connectedSignals,
   disconnectedSignals,
+  groupSignalsByTicker,
   latestSignalPerTicker,
+  firstTickerWithChain,
   parseSignalRow,
+  signalHasChain,
   signalsDenied,
 } from "./signals.ts";
 
@@ -47,6 +50,46 @@ describe("signals", () => {
     assert.equal(latest.AAPL?.id, "2");
     assert.equal(latest.AAPL?.thesisSummary, "new");
     assert.equal(connectedSignals(latest).status, "connected");
+    assert.equal(signalHasChain(older), false);
+  });
+
+  it("reads cause-effect chain and checkpoints from the data jsonb", () => {
+    const row = parseSignalRow({
+      id: "cuda-inference:NVDA",
+      ticker: "NVDA",
+      thesis_summary: "CUDA premium fades",
+      data: {
+        provenance: {
+          mechanism_slug: "cuda-inference-premium",
+          mechanism_title: "CUDA inference premium",
+          source_refs: ["https://brain.example/cuda"],
+        },
+        thesis: {
+          summary: "CUDA premium fades",
+          chain: [
+            { step: 1, claim: "Inference moves off CUDA", evidence_status: "partial", source_ref: "vault/nvda" },
+            { step: 2, claim: "Software multiple compresses", evidence_status: "open" },
+          ],
+          contradictions: ["Datacenter still growing"],
+        },
+        checkpoints: [
+          { kind: "next", date: "2026-10-21", label: "Q3 print", note: null },
+          { kind: "break", date: null, label: "CUDA share holds", note: null },
+        ],
+      },
+    });
+    assert.ok(row);
+    assert.equal(row.mechanismTitle, "CUDA inference premium");
+    assert.equal(row.chain.length, 2);
+    assert.equal(row.chain[0]?.claim, "Inference moves off CUDA");
+    assert.equal(row.chain[0]?.evidenceStatus, "partial");
+    assert.equal(row.checkpoints[0]?.kind, "next");
+    assert.equal(row.sourceRefs[0], "https://brain.example/cuda");
+    assert.equal(signalHasChain(row), true);
+    const grouped = groupSignalsByTicker([row]);
+    assert.equal(grouped.NVDA?.length, 1);
+    assert.equal(firstTickerWithChain(["AAPL", "NVDA"], grouped), "NVDA");
+    assert.equal(firstTickerWithChain(["AAPL", "MSFT"], grouped), null);
   });
 
   it("treats anon deny statuses as disconnected", () => {

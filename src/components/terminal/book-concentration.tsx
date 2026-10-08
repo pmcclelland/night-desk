@@ -1,31 +1,24 @@
+import { ReviewCard } from "@/components/terminal/review-card";
 import {
   barWidthPct,
   formatSharePct,
   type ConcentrationSnapshot,
 } from "@/lib/book-concentration";
+import { nameOf } from "@/lib/universe";
 
 function SectorRow({ label, share }: { label: string; share: number }) {
   const width = barWidthPct(share);
   return (
-    <div className="flex h-6 min-w-0 items-center gap-3">
-      <span className="w-[14ch] shrink-0 truncate font-mono text-2xs text-fg">{label}</span>
-      <div className="min-w-0 max-w-lg flex-1">
+    <div className="flex min-h-8 min-w-0 items-center gap-3">
+      <span className="w-28 shrink-0 truncate text-xs text-fg">{label}</span>
+      <div className="min-w-0 flex-1">
         <div className="h-1.5 w-full bg-elevated" aria-hidden>
           <div className="h-full bg-muted" style={{ width: `${width}%` }} />
         </div>
       </div>
-      <span className="w-14 shrink-0 text-right font-mono text-2xs tabular-nums text-fg">
+      <span className="w-12 shrink-0 text-right font-mono text-xs tabular-nums text-muted">
         {formatSharePct(share)}
       </span>
-    </div>
-  );
-}
-
-function ConcStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-col leading-none">
-      <span className="font-mono text-micro tracking-widest text-subtle uppercase">{label}</span>
-      <span className="mt-1 whitespace-nowrap font-mono text-2xs tabular-nums text-fg">{value}</span>
     </div>
   );
 }
@@ -37,27 +30,24 @@ export function BookConcentration({
   snap: ConcentrationSnapshot;
   sim: boolean;
 }) {
-  const names = snap.top5.map((row) => row.symbol).join(" · ");
+  const names = snap.top5.map((row) => nameOf(row.symbol)).join(", ");
   return (
-    <section className="shrink-0 border-t border-border bg-surface px-3 py-2">
-      <div className="flex items-baseline gap-2">
-        <p className="font-mono text-micro tracking-widest text-subtle uppercase">Concentration</p>
-        {sim ? (
-          <p className="font-mono text-micro tracking-widest text-muted uppercase">Sim</p>
-        ) : null}
-      </div>
-      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
-        <ConcStat label="Top 5" value={formatSharePct(snap.top5SharePct)} />
-        <ConcStat label="Cash" value={formatSharePct(snap.cashPct)} />
-      </div>
-      <p className="mt-2 min-w-0 truncate font-mono text-2xs text-subtle">{names || "—"}</p>
+    <ReviewCard
+      title="How spread out the book is"
+      dek="If a few names dominate, a bad day in one of them moves the whole book."
+      hint={sim ? "From the practice book." : undefined}
+    >
+      <p className="text-sm leading-relaxed text-fg text-pretty">
+        The five largest names are {formatSharePct(snap.top5SharePct)} of the book
+        {names ? ` (${names})` : ""}. Cash is {formatSharePct(snap.cashPct)}.
+      </p>
       {snap.sectors.length > 0 ? (
-        <div className="mt-2">
+        <div className="mt-4">
           {snap.sectors.map((row) => (
             <SectorRow key={row.sector} label={row.sector} share={row.sharePct} />
           ))}
         </div>
       ) : null}
-    </section>
+    </ReviewCard>
   );
 }
