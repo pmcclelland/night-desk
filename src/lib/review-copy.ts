@@ -140,6 +140,11 @@ export function humanizeSlug(slug: string | null): string {
   return titleCaseWords(slug.replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim());
 }
 
+/** Vault copy writes ASCII arrows; render them as a proper →. */
+export function normalizeArrows(text: string): string {
+  return text.replace(/\s*->\s*/g, " → ");
+}
+
 const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 /** Vault dates, including partials like 2026-08-XX → Aug 2026. */

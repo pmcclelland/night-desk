@@ -14,6 +14,7 @@ import {
   journalSidePlain,
   newsAgo,
   nextCheckInPlain,
+  normalizeArrows,
   softenShouting,
   sourceTitle,
   thesisAgePlain,
@@ -66,6 +67,15 @@ describe("review-copy", () => {
       "Conviction downgraded: Jensen Huang on Q1 FY2027",
     );
     assert.match(softenShouting("CUDA becomes less load-bearing"), /CUDA/);
+  });
+
+  it("normalizes ASCII arrows in chain copy", () => {
+    assert.equal(
+      normalizeArrows("Financing becomes the binding AI constraint -> Nvidia lends its AA credit"),
+      "Financing becomes the binding AI constraint → Nvidia lends its AA credit",
+    );
+    assert.equal(normalizeArrows("A->B->C"), "A → B → C");
+    assert.equal(normalizeArrows("already → fine"), "already → fine");
   });
 
   it("formats partial vault dates and source slugs", () => {

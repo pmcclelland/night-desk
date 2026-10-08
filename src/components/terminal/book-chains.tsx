@@ -8,6 +8,7 @@ import {
   evidencePlain,
   formatVaultDate,
   humanizeSlug,
+  normalizeArrows,
   softenShouting,
   sourceTitle,
 } from "@/lib/review-copy";
@@ -89,7 +90,7 @@ export function BookChains({
 }
 
 function ChainBlock({ row }: { row: BrainSignal }) {
-  const title = row.mechanismTitle || humanizeSlug(row.mechanismSlug);
+  const title = normalizeArrows(row.mechanismTitle || humanizeSlug(row.mechanismSlug));
   const stepCount = row.chain.length;
   const sources = uniqueSources(row);
 
@@ -110,7 +111,7 @@ function ChainBlock({ row }: { row: BrainSignal }) {
               <li key={`${row.id}:${step.step}`} className="min-w-0">
                 <p className="text-sm leading-relaxed text-fg text-pretty">
                   <span className="mr-2 font-mono text-2xs text-subtle">{step.step}.</span>
-                  {softenShouting(step.claim)}
+                  {normalizeArrows(softenShouting(step.claim))}
                 </p>
                 <p className="mt-1 text-xs text-muted">{evidencePlain(step.evidenceStatus)}</p>
                 {step.keyQuote ? (
