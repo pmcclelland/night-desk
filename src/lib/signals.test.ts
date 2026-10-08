@@ -6,6 +6,7 @@ import {
   disconnectedSignals,
   groupSignalsByTicker,
   latestSignalPerTicker,
+  firstTickerWithChain,
   parseSignalRow,
   signalHasChain,
   signalsDenied,
@@ -87,6 +88,8 @@ describe("signals", () => {
     assert.equal(signalHasChain(row), true);
     const grouped = groupSignalsByTicker([row]);
     assert.equal(grouped.NVDA?.length, 1);
+    assert.equal(firstTickerWithChain(["AAPL", "NVDA"], grouped), "NVDA");
+    assert.equal(firstTickerWithChain(["AAPL", "MSFT"], grouped), null);
   });
 
   it("treats anon deny statuses as disconnected", () => {

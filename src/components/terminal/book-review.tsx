@@ -49,7 +49,13 @@ import {
 import { fetchPublicCurveSeries } from "@/lib/server/market";
 import { fetchTickerNews } from "@/lib/server/news";
 import { fetchBrainSignals } from "@/lib/server/trader-signals";
-import { disconnectedSignals, SIGNALS_NOT_CONNECTED, type SignalsSnapshot } from "@/lib/signals";
+import {
+  disconnectedSignals,
+  firstTickerWithChain,
+  SIGNALS_NOT_CONNECTED,
+  signalHasChain,
+  type SignalsSnapshot,
+} from "@/lib/signals";
 import type { NewsItem } from "@/lib/news";
 import {
   convictionPlain,
@@ -150,6 +156,7 @@ export function BookReview() {
     .map((o) => o.id)
     .join(",");
   const [cursor, setCursor] = useState(() => selected);
+  const [chainFocus, setChainFocus] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [form, setForm] = useState<ThesisForm>(EMPTY_FORM);
   const rowRefs = useRef<Record<string, HTMLElement | null>>({});
@@ -344,10 +351,12 @@ export function BookReview() {
     return out;
   }, [selected, signals, symbols]);
   const chainTicker = useMemo(() => {
-    if (cursor && !cursor.startsWith("jr:") && chainTickers.includes(cursor)) return cursor;
-    if (selected && chainTickers.includes(selected)) return selected;
+    if (chainFocus && chainTickers.includes(chainFocus)) return chainFocus;
+    if (signals.status === "connected") {
+      return firstTickerWithChain(chainTickers, signals.allByTicker) ?? chainTickers[0] ?? null;
+    }
     return chainTickers[0] ?? null;
-  }, [chainTickers, cursor, selected]);
+  }, [chainFocus, chainTickers, signals]);
 
   useEffect(() => {
     if (cursor.startsWith("jr:")) {
@@ -465,6 +474,9 @@ export function BookReview() {
   function pickTicker(symbol: string) {
     setCursor(symbol);
     selectSymbol(symbol);
+    if (signals.status === "connected" && (signals.allByTicker[symbol] ?? []).some(signalHasChain)) {
+      setChainFocus(symbol);
+    }
   }
 
   return (
@@ -569,6 +581,7 @@ export function BookReview() {
                 </div>
               )}
             </ReviewCard>
+            <BookNews items={news} loading={newsLoading} failed={newsFailed} />
           </div>
 
           <div className="flex flex-col gap-4">
@@ -578,10 +591,9 @@ export function BookReview() {
               ticker={chainTicker}
               tickers={chainTickers}
               signals={signals}
-              onPick={pickTicker}
+              onPick={(sym) => setChainFocus(sym)}
             />
             <BookCatalysts rows={catalysts} loading={catalystLoading} sim={simJournal} />
-            <BookNews items={news} loading={newsLoading} failed={newsFailed} />
           </div>
           <div className="lg:col-span-3">
             <BookJournal

@@ -203,6 +203,16 @@ export function signalHasChain(row: BrainSignal) {
   return row.chain.length > 0;
 }
 
+export function firstTickerWithChain(
+  tickers: string[],
+  allByTicker: Record<string, BrainSignal[]>,
+): string | null {
+  for (const ticker of tickers) {
+    if ((allByTicker[ticker] ?? []).some(signalHasChain)) return ticker;
+  }
+  return null;
+}
+
 export function latestSignalPerTicker(rows: BrainSignal[]): Record<string, BrainSignal> {
   const out: Record<string, BrainSignal> = {};
   for (const row of rows) {

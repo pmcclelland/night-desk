@@ -8,7 +8,6 @@ import {
   evidencePlain,
   formatVaultDate,
   humanizeSlug,
-  nextCheckInPlain,
   softenShouting,
   sourceTitle,
 } from "@/lib/review-copy";
@@ -91,8 +90,6 @@ export function BookChains({
 
 function ChainBlock({ row }: { row: BrainSignal }) {
   const title = row.mechanismTitle || humanizeSlug(row.mechanismSlug);
-  const summary = row.thesisSummary ? softenShouting(row.thesisSummary) : null;
-  const checkIn = nextCheckInPlain(row.checkpoints);
   const stepCount = row.chain.length;
   const sources = uniqueSources(row);
 
@@ -101,12 +98,7 @@ function ChainBlock({ row }: { row: BrainSignal }) {
       <h3 className="font-sans text-sm font-medium text-fg text-pretty">{title}</h3>
       <p className="mt-1 text-xs text-muted">
         {directionPlain(row.direction)} · {convictionPlain(row.convictionLabel)}
-        {row.asOf ? ` · as of ${formatVaultDate(row.asOf.slice(0, 10)) ?? row.asOf}` : ""}
       </p>
-      {summary ? (
-        <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-fg text-pretty">{summary}</p>
-      ) : null}
-      {checkIn ? <p className="mt-2 text-xs leading-relaxed text-subtle">{checkIn}</p> : null}
 
       {stepCount > 0 ? (
         <details className="mt-3">
