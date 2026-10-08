@@ -1,6 +1,12 @@
 import type { ErrorComponentProps } from "@tanstack/react-router";
 import { TriangleAlert } from "lucide-react";
 
+function errorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === "string" && error.trim()) return error;
+  return "An unexpected error occurred. Reload the terminal.";
+}
+
 export function AppErrorComponent({ error }: ErrorComponentProps) {
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-bg px-6 text-center text-fg">
@@ -9,7 +15,7 @@ export function AppErrorComponent({ error }: ErrorComponentProps) {
       </span>
       <h1 className="font-mono text-sm tracking-widest uppercase">Desk fault</h1>
       <p className="max-w-md font-mono text-xs break-words text-muted">
-        {error.message || "An unexpected error occurred. Reload the terminal."}
+        {errorMessage(error)}
       </p>
     </main>
   );
