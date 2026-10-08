@@ -1,8 +1,7 @@
-import {
-  formatCatalystDay,
-  kindLabel,
-  type CatalystRow,
-} from "@/lib/book-catalysts";
+import { ReviewCard, ReviewEmpty } from "@/components/terminal/review-card";
+import { formatCatalystDay, type CatalystRow } from "@/lib/book-catalysts";
+import { catalystKindPlain, catalystWhenPlain } from "@/lib/review-copy";
+import { nameOf } from "@/lib/universe";
 
 export function BookCatalysts({
   rows,
@@ -14,41 +13,33 @@ export function BookCatalysts({
   sim: boolean;
 }) {
   return (
-    <section className="shrink-0 border-t border-border bg-surface px-3 py-2">
-      <div className="flex items-baseline gap-2">
-        <p className="font-mono text-micro tracking-widest text-subtle uppercase">
-          Catalysts · {rows.length} in 14d
-        </p>
-        {sim ? (
-          <p className="font-mono text-micro tracking-widest text-muted uppercase">Sim</p>
-        ) : null}
-      </div>
+    <ReviewCard
+      title="Coming up"
+      dek="Earnings reports and dividend cutoffs in the next two weeks for names you hold."
+      hint={sim ? "Sample dates on the practice book." : undefined}
+    >
       {loading && rows.length === 0 ? (
-        <p className="mt-2 font-mono text-micro tracking-widest text-subtle uppercase">
-          Loading catalysts
-        </p>
+        <ReviewEmpty>Looking up upcoming dates…</ReviewEmpty>
       ) : rows.length === 0 ? (
-        <p className="mt-2 font-mono text-micro tracking-widest text-subtle uppercase">
-          Nothing in the next 14 days
-        </p>
+        <ReviewEmpty>Nothing on the calendar in the next 14 days.</ReviewEmpty>
       ) : (
-        <div className="mt-2">
-          {rows.map((row) => (
-            <div key={row.id} className="flex h-6 min-w-0 items-center gap-3">
-              <span className="w-14 shrink-0 font-mono text-2xs tabular-nums text-fg">
-                {formatCatalystDay(row.at)}
-              </span>
-              <span className="w-12 shrink-0 font-mono text-2xs text-fg">{row.symbol}</span>
-              <span className="shrink-0 font-mono text-2xs text-muted uppercase">
-                {kindLabel(row.kind)}
-              </span>
-              <span className="min-w-0 truncate font-mono text-2xs text-subtle">
-                {row.detail ?? "—"}
-              </span>
-            </div>
-          ))}
-        </div>
+        <ul className="space-y-3">
+          {rows.map((row) => {
+            const when = catalystWhenPlain(row.kind, row.detail);
+            return (
+              <li key={row.id} className="min-w-0 text-sm leading-relaxed text-pretty">
+                <span className="text-fg">
+                  {formatCatalystDay(row.at)} · {nameOf(row.symbol)}
+                </span>
+                <span className="mt-0.5 block text-xs text-muted">
+                  {catalystKindPlain(row.kind)}
+                  {when ? ` — ${when}` : ""}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
       )}
-    </section>
+    </ReviewCard>
   );
 }

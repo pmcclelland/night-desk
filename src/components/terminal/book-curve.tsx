@@ -6,7 +6,9 @@ import {
   formatCurveAxis,
   type BookCurveSnapshot,
 } from "@/lib/book-curve";
+import { ReviewCard } from "@/components/terminal/review-card";
 import { barTime, money, pct, signClass } from "@/lib/format";
+import { RANGE_LABEL, curveHeadline } from "@/lib/review-copy";
 import type { CurveRange, EquityPoint } from "@/lib/types";
 import { cn } from "@/lib/cn";
 
@@ -25,15 +27,11 @@ export function BookCurvePanel({
   const spyRet = snap?.spyRet ?? null;
   const vs = snap?.vsSpy ?? null;
   return (
-    <section className="shrink-0 border-b border-border bg-surface px-3 py-2">
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-        <div className="flex items-baseline gap-2">
-          <p className="font-mono text-micro tracking-widest text-subtle uppercase">Curve</p>
-          {snap?.label === "sim" ? (
-            <p className="font-mono text-micro tracking-widest text-muted uppercase">Sim</p>
-          ) : null}
-        </div>
-        <div role="group" aria-label="Curve range" className="flex items-center">
+    <ReviewCard
+      title="How the book has moved"
+      dek="Your holdings versus the S&P 500 (the SPY fund). Amber is the book; gray is the market."
+      action={
+        <div role="group" aria-label="Time window" className="flex items-center">
           {CURVE_RANGES.map((r, i) => (
             <Fragment key={r}>
               {i > 0 ? (
@@ -44,44 +42,49 @@ export function BookCurvePanel({
                 aria-pressed={r === range}
                 onClick={() => onRange(r)}
                 className={cn(
-                  "px-1.5 py-2.5 font-mono text-2xs leading-6 tracking-widest uppercase md:py-2",
+                  "min-h-11 px-1.5 py-2 font-mono text-2xs leading-6 tracking-wide uppercase md:min-h-0 md:py-2",
                   r === range ? "text-accent" : "text-subtle hover:text-fg",
                 )}
               >
-                {r}
+                {RANGE_LABEL[r]}
               </button>
             </Fragment>
           ))}
         </div>
-      </div>
-      <div className="mt-1 flex flex-wrap items-baseline gap-x-4 gap-y-1 font-mono text-2xs tabular-nums">
+      }
+    >
+      <p className="text-base leading-relaxed text-fg text-pretty">{curveHeadline(snap)}</p>
+      {snap?.label === "sim" ? (
+        <p className="mt-1 text-xs text-muted">Practice book — simulated, not a live brokerage account.</p>
+      ) : null}
+      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs tabular-nums">
         <span>
-          <span className="text-accent">Book</span>{" "}
+          <span className="text-muted">Book </span>
           <span className={signClass(bookRet ?? 0)}>{bookRet != null ? pct(bookRet) : "—"}</span>
         </span>
-        <span>
-          <span className="text-muted">SPY</span>{" "}
+        <span title="S&P 500 exchange-traded fund">
+          <span className="text-muted">S&P 500 </span>
           <span className={signClass(spyRet ?? 0)}>{spyRet != null ? pct(spyRet) : "—"}</span>
         </span>
-        <span>
-          <span className="text-subtle">vs</span>{" "}
+        <span title="How many percentage points the book is ahead of or behind the S&P 500">
+          <span className="text-muted">Gap </span>
           <span className={signClass(vs ?? 0)}>{vs != null ? pct(vs) : "—"}</span>
         </span>
       </div>
-      <div className="relative mt-2 h-36">
+      <div className="relative mt-3 h-40">
         {loading && !snap ? (
-          <div className="absolute inset-0 flex items-center justify-center font-mono text-micro tracking-widest text-subtle uppercase">
-            Loading curve
+          <div className="absolute inset-0 flex items-center justify-center text-xs text-muted">
+            Loading the picture…
           </div>
         ) : snap && snap.book.length > 1 ? (
           <CurveSvg book={snap.book} spy={snap.spy} />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center font-mono text-micro tracking-widest text-subtle uppercase">
-            No curve
+          <div className="absolute inset-0 flex items-center justify-center text-xs text-muted">
+            Not enough history to draw a line.
           </div>
         )}
       </div>
-    </section>
+    </ReviewCard>
   );
 }
 

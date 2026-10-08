@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import {
   connectedSignals,
   disconnectedSignals,
+  groupSignalsByTicker,
   latestSignalPerTicker,
   parseSignalRow,
   signalsDenied,
@@ -20,7 +21,7 @@ function traderConfig() {
 
 function tickerFilter(tickers: string[]) {
   const clean = [...new Set(tickers.map((t) => t.trim().toUpperCase()).filter(Boolean))];
-  return clean;
+  return clean.slice(0, 24);
 }
 
 export async function loadBrainSignals(tickers: string[]): Promise<SignalsSnapshot> {
@@ -51,7 +52,7 @@ export async function loadBrainSignals(tickers: string[]): Promise<SignalsSnapsh
     const body: unknown = await res.json();
     if (!Array.isArray(body)) return disconnectedSignals();
     const rows = body.map(parseSignalRow).filter((row): row is NonNullable<typeof row> => row !== null);
-    return connectedSignals(latestSignalPerTicker(rows));
+    return connectedSignals(latestSignalPerTicker(rows), groupSignalsByTicker(rows));
   } catch {
     return disconnectedSignals();
   }

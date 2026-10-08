@@ -1,7 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import {
-  formatThesisAge,
   toBookPerformanceView,
   type BookThesis,
   type Conviction,
@@ -20,6 +19,9 @@ import { BookCatalysts } from "@/components/terminal/book-catalysts";
 import { BookConcentration } from "@/components/terminal/book-concentration";
 import { BookCurvePanel } from "@/components/terminal/book-curve";
 import { BookJournal } from "@/components/terminal/book-journal";
+import { BookChains } from "@/components/terminal/book-chains";
+import { BookNews } from "@/components/terminal/book-news";
+import { ReviewCard, ReviewEmpty } from "@/components/terminal/review-card";
 import {
   nextCurveRange,
   reconstructSimCurve,
@@ -45,8 +47,15 @@ import {
   putThesis,
 } from "@/lib/server/desk-api";
 import { fetchPublicCurveSeries } from "@/lib/server/market";
+import { fetchTickerNews } from "@/lib/server/news";
 import { fetchBrainSignals } from "@/lib/server/trader-signals";
 import { disconnectedSignals, SIGNALS_NOT_CONNECTED, type SignalsSnapshot } from "@/lib/signals";
+import type { NewsItem } from "@/lib/news";
+import {
+  convictionPlain,
+  directionPlain,
+  thesisAgePlain,
+} from "@/lib/review-copy";
 import type { CurveRange } from "@/lib/types";
 import {
   loadGuestTheses,
@@ -56,6 +65,7 @@ import {
   thesisIsBlank,
   upsertGuestThesis,
 } from "@/lib/thesis";
+import { nameOf } from "@/lib/universe";
 import { selectLiveFeed, selectVenue, useDesk, useLiveBook } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -97,6 +107,7 @@ export function BookReview() {
   const guest = useDesk((s) => s.guestDemo);
   const liveFeed = useDesk(selectLiveFeed);
   const selected = useDesk((s) => s.selected);
+  const watchlist = useDesk((s) => s.watchlist);
   const [theses, setTheses] = useState<Record<string, BookThesis>>({});
   const [signals, setSignals] = useState<SignalsSnapshot | { status: "loading" }>({
     status: "loading",
@@ -109,6 +120,9 @@ export function BookReview() {
   const [journalLoading, setJournalLoading] = useState(true);
   const [catalysts, setCatalysts] = useState<CatalystRow[]>([]);
   const [catalystLoading, setCatalystLoading] = useState(true);
+  const [news, setNews] = useState<NewsItem[]>([]);
+  const [newsLoading, setNewsLoading] = useState(true);
+  const [newsFailed, setNewsFailed] = useState(false);
 
   const view = useMemo(
     () =>
@@ -125,6 +139,7 @@ export function BookReview() {
 
   const symbols = useMemo(() => view.positions.map((p) => p.symbol), [view.positions]);
   const tickerKey = symbols.join(",");
+  const watchKey = watchlist.join(",");
   const lotKey = view.positions.map((p) => `${p.symbol}:${p.qty}`).join(",");
   const useAlpacaCurve = !guest && venue !== "sim";
   const simJournal = guest || venue === "sim";
@@ -135,7 +150,7 @@ export function BookReview() {
   const [cursor, setCursor] = useState(() => selected);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [form, setForm] = useState<ThesisForm>(EMPTY_FORM);
-  const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
+  const rowRefs = useRef<Record<string, HTMLElement | null>>({});
 
   useEffect(() => {
     if (guest) {
@@ -156,7 +171,9 @@ export function BookReview() {
   }, [guest]);
 
   useEffect(() => {
-    const tickers = tickerKey ? tickerKey.split(",") : [];
+    const held = tickerKey ? tickerKey.split(",") : [];
+    const watched = watchKey ? watchKey.split(",") : [];
+    const tickers = [...held, ...watched];
     let live = true;
     const fallback = window.setTimeout(() => {
       if (live) setSignals(disconnectedSignals());
@@ -176,7 +193,32 @@ export function BookReview() {
       live = false;
       window.clearTimeout(fallback);
     };
-  }, [tickerKey]);
+  }, [tickerKey, watchKey]);
+
+  useEffect(() => {
+    const held = tickerKey ? tickerKey.split(",").filter(Boolean) : [];
+    const watched = watchKey ? watchKey.split(",").filter(Boolean) : [];
+    let live = true;
+    setNewsLoading(true);
+    setNewsFailed(false);
+    void fetchTickerNews({ data: { held, watched } })
+      .then((res) => {
+        if (!live) return;
+        setNews(res.items);
+        setNewsFailed(!res.ok && res.items.length === 0);
+      })
+      .catch(() => {
+        if (!live) return;
+        setNews([]);
+        setNewsFailed(true);
+      })
+      .finally(() => {
+        if (live) setNewsLoading(false);
+      });
+    return () => {
+      live = false;
+    };
+  }, [tickerKey, watchKey]);
 
   useEffect(() => {
     let live = true;
@@ -287,6 +329,23 @@ export function BookReview() {
     () => reviewNavKeys(symbols, journalRows.map((row) => row.id)),
     [symbols, journalRows],
   );
+  const chainTickers = useMemo(() => {
+    const out: string[] = [];
+    const seen = new Set<string>();
+    const extra = signals.status === "connected" ? Object.keys(signals.allByTicker) : [];
+    for (const raw of [...symbols, ...extra, selected]) {
+      const s = raw.trim().toUpperCase();
+      if (!s || seen.has(s)) continue;
+      seen.add(s);
+      out.push(s);
+    }
+    return out;
+  }, [selected, signals, symbols]);
+  const chainTicker = useMemo(() => {
+    if (cursor && !cursor.startsWith("jr:") && chainTickers.includes(cursor)) return cursor;
+    if (selected && chainTickers.includes(selected)) return selected;
+    return chainTickers[0] ?? null;
+  }, [chainTickers, cursor, selected]);
 
   useEffect(() => {
     if (cursor.startsWith("jr:")) {
@@ -395,129 +454,101 @@ export function BookReview() {
   }
 
   const openRow = view.positions.find((p) => p.symbol === expanded) ?? null;
+  const names = view.positions.length;
+  const hero =
+    names === 0
+      ? "No open positions right now."
+      : `You're holding ${names} name${names === 1 ? "" : "s"}. Open profit is ${signedMoney(view.unrealizedPl)}. Today is ${signedMoney(view.dayPl)} (${pct(view.dayPlPct)}).`;
+
+  function pickTicker(symbol: string) {
+    setCursor(symbol);
+    selectSymbol(symbol);
+  }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-bg">
-      <section className="shrink-0 border-b border-border bg-surface px-3 py-2">
-        <p className="font-mono text-micro tracking-widest text-subtle uppercase">
-          Book · {view.positions.length} names
-        </p>
-        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
-          <Stat label="Unrl" value={`${signedMoney(view.unrealizedPl)}`} valueClass={signClass(view.unrealizedPl)} />
-          <Stat
-            label="Day"
-            value={`${signedMoney(view.dayPl)} ${pct(view.dayPlPct)}`}
-            valueClass={signClass(view.dayPl)}
-          />
-          <Stat label="Realized" value={signedMoney(view.realizedToday)} />
-          <Stat label="Cash" value={money(view.cash, true)} />
-        </div>
-      </section>
+    <div className="min-h-0 flex-1 overflow-auto bg-bg">
+      <div className="mx-auto w-full max-w-7xl px-4 py-5 md:px-6 md:py-6">
+        <header className="mb-5 max-w-3xl">
+          <p className="text-xs tracking-wide text-subtle">Review</p>
+          <h1 className="mt-1 font-sans text-xl font-medium tracking-tight text-fg text-balance md:text-2xl">
+            {hero}
+          </h1>
+          <p className="mt-2 text-sm leading-relaxed text-muted text-pretty">
+            Cash on hand {money(view.cash, true)}
+            {view.realizedToday
+              ? ` · locked in today ${signedMoney(view.realizedToday)}`
+              : ""}
+            . This page is for reading the book, not sending orders.
+          </p>
+        </header>
 
-      <BookCurvePanel range={curveRange} onRange={setCurveRange} snap={curve} loading={curveLoading} />
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            <BookCurvePanel range={curveRange} onRange={setCurveRange} snap={curve} loading={curveLoading} />
+          </div>
+          <BookConcentration snap={concentration} sim={simJournal} />
 
-      <SignalsPanel symbols={symbols} signals={signals} />
-
-      <div className="min-h-0 flex-1 overflow-auto">
-      {view.positions.length === 0 ? (
-        <div className="flex items-center justify-center px-4 py-8 font-mono text-micro tracking-widest text-subtle uppercase">
-          No open risk
-        </div>
-      ) : (
-          <table className="w-full border-separate border-spacing-0 font-mono text-2xs tabular-nums">
-            <thead className="sticky top-0 bg-surface text-micro tracking-widest text-subtle uppercase">
-              <tr>
-                <th className="w-px whitespace-nowrap border-l-2 border-transparent px-2 py-1 text-left font-medium">
-                  Sym
-                </th>
-                <th className="hidden w-px whitespace-nowrap px-2 py-1 text-right font-medium sm:table-cell">
-                  Qty
-                </th>
-                <th className="hidden w-px whitespace-nowrap px-2 py-1 text-right font-medium md:table-cell">
-                  Wgt
-                </th>
-                <th className="hidden w-px whitespace-nowrap px-2 py-1 text-right font-medium sm:table-cell">
-                  Cost
-                </th>
-                <th className="w-px whitespace-nowrap px-2 py-1 text-right font-medium">P&L</th>
-                <th className="hidden w-px whitespace-nowrap px-2 py-1 text-right font-medium md:table-cell">
-                  Day
-                </th>
-                <th className="w-full px-2 py-1 text-left font-medium">Thesis</th>
-              </tr>
-            </thead>
-            <tbody>
-              {view.positions.map((p) => {
-                const active = p.symbol === cursor;
-                const open = expanded === p.symbol;
-                const marked = active;
-                return (
-                  <Fragment key={p.symbol}>
-                    <tr
-                      ref={(el) => {
-                        rowRefs.current[p.symbol] = el;
-                      }}
-                      data-symbol={p.symbol}
-                      data-last={String(p.last)}
-                      className={cn(
-                        "cursor-pointer border-t border-border/60",
-                        marked ? "bg-elevated" : "hover:bg-elevated/60",
-                      )}
-                      onClick={() => {
-                        setCursor(p.symbol);
-                        selectSymbol(p.symbol);
-                        setExpanded(p.symbol);
-                      }}
-                    >
-                      <td
+          <div className="lg:col-span-2">
+            <ReviewCard
+              title="Holdings"
+              dek="What you own, how much of the book it is, and why you still hold it."
+            >
+              {view.positions.length === 0 ? (
+                <ReviewEmpty>No open risk — nothing is currently held.</ReviewEmpty>
+              ) : (
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  {view.positions.map((p) => {
+                    const active = p.symbol === cursor;
+                    const open = expanded === p.symbol;
+                    return (
+                      <article
+                        key={p.symbol}
+                        ref={(el) => {
+                          rowRefs.current[p.symbol] = el;
+                        }}
+                        data-symbol={p.symbol}
+                        data-last={String(p.last)}
                         className={cn(
-                          "w-px whitespace-nowrap border-l-2 px-2 py-1.5 text-left text-fg",
-                          marked ? "border-accent" : "border-transparent",
+                          "rounded-md border border-border bg-bg p-3",
+                          active ? "border-accent/70" : "",
                         )}
                       >
-                        {p.symbol}
-                      </td>
-                      <td className="hidden w-px whitespace-nowrap px-2 py-1.5 text-right sm:table-cell">
-                        {qty(p.qty)}
-                      </td>
-                      <td className="hidden w-px whitespace-nowrap px-2 py-1.5 text-right md:table-cell">
-                        {pct(p.weightPct, false)}
-                      </td>
-                      <td className="hidden w-px whitespace-nowrap px-2 py-1.5 text-right text-muted sm:table-cell">
-                        {px(p.avgPrice)}
-                      </td>
-                      <td className={cn("w-px whitespace-nowrap px-2 py-1.5 text-right", signClass(p.unrealizedPl))}>
-                        {signedMoney(p.unrealizedPl)}{" "}
-                        <span className="text-micro">{pct(p.unrealizedPlPct)}</span>
-                      </td>
-                      <td
-                        className={cn(
-                          "hidden w-px whitespace-nowrap px-2 py-1.5 text-right md:table-cell",
-                          signClass(p.dayPl),
-                        )}
-                      >
-                        {signedMoney(p.dayPl)}{" "}
-                        <span className="text-micro">{pct(p.dayPlPct)}</span>
-                      </td>
-                      <td className="w-full min-w-0 max-w-0 px-2 py-1.5 text-left">
-                        <span className="flex min-w-0 items-baseline gap-2">
-                          <span className="min-w-0 truncate text-subtle">{p.thesis?.reasoning || "—"}</span>
-                          {p.health?.stale ? (
-                            <span className="shrink-0 text-micro tracking-widest text-down uppercase">Stale</span>
-                          ) : p.health ? (
-                            <span className="shrink-0 text-micro tracking-widest text-subtle uppercase">
-                              {formatThesisAge(p.health.ageDays)}
-                            </span>
-                          ) : null}
-                        </span>
-                      </td>
-                    </tr>
-                    {open && openRow ? (
-                      <tr>
-                        <td
-                          colSpan={7}
-                          className="border-l-2 border-accent bg-surface p-0"
+                        <button
+                          type="button"
+                          className="w-full min-h-11 text-left"
+                          onClick={() => {
+                            pickTicker(p.symbol);
+                            setExpanded(p.symbol);
+                          }}
                         >
+                          <div className="flex items-baseline justify-between gap-2">
+                            <h3 className="min-w-0 truncate text-sm font-medium text-fg">
+                              {nameOf(p.symbol)}{" "}
+                              <span className="font-mono text-2xs font-normal text-muted">{p.symbol}</span>
+                            </h3>
+                            <span className={cn("shrink-0 font-mono text-sm tabular-nums", signClass(p.unrealizedPl))}>
+                              {signedMoney(p.unrealizedPl)}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-xs leading-relaxed text-muted">
+                            {qty(p.qty)} shares · {pct(p.weightPct, false)} of the book · avg cost {px(p.avgPrice)}
+                          </p>
+                          <p className={cn("mt-1 text-xs tabular-nums", signClass(p.unrealizedPlPct))}>
+                            Open {pct(p.unrealizedPlPct)} · today{" "}
+                            <span className={signClass(p.dayPl)}>
+                              {signedMoney(p.dayPl)} {pct(p.dayPlPct)}
+                            </span>
+                          </p>
+                          <p className="mt-2 min-w-0 truncate text-xs leading-relaxed text-subtle">
+                            {p.thesis?.reasoning || "No note yet on why this is in the book."}
+                          </p>
+                          {p.health ? (
+                            <p className={cn("mt-1 text-xs", p.health.stale ? "text-down" : "text-subtle")}>
+                              {thesisAgePlain(p.health.ageDays, p.health.stale)}
+                            </p>
+                          ) : null}
+                        </button>
+                        {open && openRow ? (
                           <ThesisEditor
                             row={openRow}
                             form={form}
@@ -527,31 +558,48 @@ export function BookReview() {
                             onSave={() => void saveExpanded()}
                             onClose={() => setExpanded(null)}
                           />
-                        </td>
-                      </tr>
-                    ) : null}
-                  </Fragment>
-                );
-              })}
-            </tbody>
-          </table>
-      )}
-      <BookJournal
-        rows={journalRows}
-        loading={journalLoading}
-        sim={simJournal}
-        cursor={cursor}
-        onPick={(id) => {
-          setCursor(`jr:${id}`);
-          setExpanded(null);
-        }}
-      />
-      <BookConcentration snap={concentration} sim={simJournal} />
-      <BookCatalysts rows={catalysts} loading={catalystLoading} sim={simJournal} />
+                        ) : null}
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </ReviewCard>
+          </div>
+
+          <div className="flex flex-col gap-4">
+            <SignalsPanel symbols={symbols} signals={signals} />
+            <BookChains
+              ticker={chainTicker}
+              tickers={chainTickers}
+              signals={signals}
+              onPick={pickTicker}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 lg:col-span-3 lg:grid-cols-2">
+            <BookNews items={news} loading={newsLoading} failed={newsFailed} />
+            <BookCatalysts rows={catalysts} loading={catalystLoading} sim={simJournal} />
+          </div>
+          <div className="lg:col-span-3">
+            <BookJournal
+              rows={journalRows}
+              loading={journalLoading}
+              sim={simJournal}
+              cursor={cursor}
+              onPick={(id) => {
+                setCursor(`jr:${id}`);
+                setExpanded(null);
+              }}
+            />
+          </div>
+        </div>
+
+        <p className="mt-6 max-w-3xl text-xs leading-relaxed text-subtle text-pretty">
+          j / k move between names and closed trades · Enter opens your note · r changes the
+          time window · g opens that name on Trade · P returns to the desk.
+        </p>
       </div>
-      <p className="shrink-0 border-t border-border px-3 py-2 font-mono text-micro tracking-widest text-subtle uppercase">
-        j k move · enter thesis · r range · g trade · p desk
-      </p>
     </div>
   );
 }
@@ -565,51 +613,59 @@ function SignalsPanel({
 }) {
   switch (signals.status) {
     case "loading":
+      return (
+        <ReviewCard title="Research notes" dek="Latest take from the vault for names you hold.">
+          <ReviewEmpty>Checking research notes…</ReviewEmpty>
+        </ReviewCard>
+      );
     case "disconnected":
       return (
-        <section className="flex shrink-0 items-baseline gap-2 border-b border-border bg-surface px-3 py-2">
-          <p className="font-mono text-micro tracking-widest text-accent uppercase">Brain</p>
-          <p className="font-mono text-micro text-subtle">
-            {signals.status === "disconnected" ? SIGNALS_NOT_CONNECTED : "Checking signals…"}
-          </p>
-        </section>
+        <ReviewCard title="Research notes" dek="Latest take from the vault for names you hold.">
+          <ReviewEmpty>
+            {SIGNALS_NOT_CONNECTED}. The vault itself is private; Night Desk only reads the
+            exported signals table.
+          </ReviewEmpty>
+        </ReviewCard>
       );
     case "connected": {
       const named = symbols.filter((sym) => signals.byTicker[sym]);
       const quiet = symbols.length - named.length;
       return (
-        <section className="shrink-0 border-b border-border bg-surface px-3 py-2">
-          <p className="font-mono text-micro tracking-widest text-accent uppercase">Brain</p>
+        <ReviewCard title="Research notes" dek="Latest take from the vault for names you hold.">
           {symbols.length === 0 ? (
-            <p className="mt-2 font-mono text-2xs text-subtle">No held names</p>
+            <ReviewEmpty>No held names to match against research.</ReviewEmpty>
           ) : (
             <>
               {named.length > 0 ? (
-                <ul className="mt-2 space-y-1">
+                <ul className="space-y-3">
                   {named.map((sym) => {
                     const row = signals.byTicker[sym];
                     if (!row) return null;
                     return (
-                      <li key={sym} className="min-w-0 truncate font-mono text-2xs">
-                        <span className="text-fg">{sym}</span>
-                        <span className="text-muted">
-                          {" "}
-                          {row.direction ?? "—"} · {row.convictionLabel ?? "—"}
-                          {row.thesisSummary ? ` · ${row.thesisSummary}` : ""}
-                        </span>
+                      <li key={sym} className="min-w-0">
+                        <p className="text-sm text-fg">
+                          {nameOf(sym)}{" "}
+                          <span className="font-mono text-2xs text-muted">{sym}</span>
+                        </p>
+                        <p className="mt-1 text-xs leading-relaxed text-muted text-pretty">
+                          {directionPlain(row.direction)} · {convictionPlain(row.convictionLabel)}
+                          {row.thesisSummary ? ` — ${row.thesisSummary}` : ""}
+                        </p>
                       </li>
                     );
                   })}
                 </ul>
-              ) : null}
+              ) : (
+                <ReviewEmpty>No research notes for the names you hold.</ReviewEmpty>
+              )}
               {quiet > 0 ? (
-                <p className="mt-1 font-mono text-2xs text-subtle">
-                  {quiet} quiet
+                <p className="mt-3 text-xs text-subtle">
+                  {quiet} held name{quiet === 1 ? "" : "s"} without a research note.
                 </p>
               ) : null}
             </>
           )}
-        </section>
+        </ReviewCard>
       );
     }
     default: {
@@ -639,52 +695,44 @@ function ThesisEditor({
 }) {
   const health = row.health;
   return (
-    <div className="border-t border-border bg-surface px-3 py-3">
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <div className="flex flex-wrap gap-x-4 gap-y-1 font-mono text-2xs">
-          <HealthStat
-            label="Age"
-            value={health ? formatThesisAge(health.ageDays) : "—"}
-            warn={health?.stale}
-          />
-          <HealthStat
-            label="Since written"
-            value={health?.movePct != null ? pct(health.movePct) : "—"}
-            valueClass={health?.movePct != null ? signClass(health.movePct) : undefined}
-          />
-          <HealthStat label="Stale" value={health?.stale ? "30d+" : "No"} warn={health?.stale} />
-          {row.thesis?.writtenPrice != null ? (
-            <HealthStat label="Written" value={px(row.thesis.writtenPrice)} />
+    <div className="mt-3 border-t border-border pt-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="space-y-1 text-xs leading-relaxed text-muted">
+          <p>{health ? thesisAgePlain(health.ageDays, health.stale) : "No saved note yet."}</p>
+          {health?.movePct != null ? (
+            <p>
+              Price since you wrote this:{" "}
+              <span className={signClass(health.movePct)}>{pct(health.movePct)}</span>
+              {row.thesis?.writtenPrice != null ? ` (from ${px(row.thesis.writtenPrice)})` : ""}
+            </p>
           ) : null}
         </div>
         <button
           type="button"
           onClick={onClose}
-          className="font-mono text-micro tracking-widest text-subtle uppercase hover:text-fg"
+          className="min-h-11 px-2 text-xs text-subtle hover:text-fg md:min-h-0"
         >
           Close
         </button>
       </div>
 
       {guest ? (
-        <p className="mt-3 font-mono text-micro tracking-widest text-muted uppercase">
-          Local only · not written to the desk
-        </p>
+        <p className="mt-2 text-xs text-muted">Saved in this browser only — not written to the desk.</p>
       ) : null}
 
       <label className="mt-3 block">
-        <span className="font-mono text-micro tracking-widest text-subtle uppercase">Reasoning</span>
+        <span className="text-xs text-muted">Why you hold this</span>
         <textarea
           value={form.reasoning}
           onChange={(e) => onChange({ ...form, reasoning: e.target.value })}
           rows={3}
-          className="mt-1 w-full resize-y border border-border bg-bg px-2 py-2 font-mono text-2xs text-fg outline-none placeholder:text-subtle focus:border-accent focus:ring-1 focus:ring-accent"
-          placeholder="Why this name is in the book"
+          className="mt-1 w-full resize-y rounded-md border border-border bg-surface px-2 py-2 text-sm text-fg outline-none placeholder:text-subtle focus:border-accent focus:ring-1 focus:ring-accent"
+          placeholder="A short note in plain English"
         />
       </label>
 
       <div className="mt-3">
-        <p className="font-mono text-micro tracking-widest text-subtle uppercase">Conviction</p>
+        <p className="text-xs text-muted">How sure you are</p>
         <div role="group" aria-label="Conviction" className="mt-1 flex items-center">
           {CONVICTIONS.map((c, i) => (
             <Fragment key={c}>
@@ -696,7 +744,7 @@ function ThesisEditor({
                 aria-pressed={form.conviction === c}
                 onClick={() => onChange({ ...form, conviction: form.conviction === c ? null : c })}
                 className={cn(
-                  "px-1.5 py-2.5 font-mono text-2xs leading-6 tracking-widest uppercase md:py-2",
+                  "min-h-11 px-1.5 py-2 text-xs capitalize md:min-h-0 md:py-2",
                   form.conviction === c ? "text-accent" : "text-subtle hover:text-fg",
                 )}
               >
@@ -708,31 +756,31 @@ function ThesisEditor({
       </div>
 
       <label className="mt-3 block">
-        <span className="font-mono text-micro tracking-widest text-subtle uppercase">Drivers</span>
+        <span className="text-xs text-muted">What has to go right</span>
         <Input
           value={form.drivers}
           onChange={(e) => onChange({ ...form, drivers: e.target.value })}
           placeholder="comma separated"
-          className="mt-1 h-11 text-2xs sm:h-9"
+          className="mt-1 h-11 text-sm sm:h-9"
         />
       </label>
 
       <div className="mt-3 flex items-end gap-3">
         <label className="min-w-0 flex-1">
-          <span className="font-mono text-micro tracking-widest text-subtle uppercase">Invalidation</span>
+          <span className="text-xs text-muted">What would prove this wrong</span>
           <Input
             value={form.invalidation}
             onChange={(e) => onChange({ ...form, invalidation: e.target.value })}
-            className="mt-1 h-11 text-2xs sm:h-9"
+            className="mt-1 h-11 text-sm sm:h-9"
           />
         </label>
         <label className="w-[12ch] shrink-0">
-          <span className="font-mono text-micro tracking-widest text-subtle uppercase">Target</span>
+          <span className="text-xs text-muted">Price aim</span>
           <Input
             value={form.target}
             onChange={(e) => onChange({ ...form, target: e.target.value })}
             inputMode="decimal"
-            className="mt-1 h-11 w-full text-2xs tabular-nums sm:h-9"
+            className="mt-1 h-11 w-full text-sm tabular-nums sm:h-9"
           />
         </label>
       </div>
@@ -752,52 +800,6 @@ function ThesisEditor({
           Clear
         </Button>
       </div>
-    </div>
-  );
-}
-
-function HealthStat({
-  label,
-  value,
-  warn,
-  valueClass,
-}: {
-  label: string;
-  value: string;
-  warn?: boolean;
-  valueClass?: string;
-}) {
-  return (
-    <div className="flex flex-col leading-none">
-      <span className="font-mono text-micro tracking-widest text-subtle uppercase">{label}</span>
-      <span
-        className={cn(
-          "mt-1 whitespace-nowrap font-mono text-2xs tabular-nums",
-          warn ? "text-down" : "text-fg",
-          valueClass,
-        )}
-      >
-        {value}
-      </span>
-    </div>
-  );
-}
-
-function Stat({
-  label,
-  value,
-  valueClass,
-}: {
-  label: string;
-  value: string;
-  valueClass?: string;
-}) {
-  return (
-    <div className="flex flex-col leading-none">
-      <span className="font-mono text-micro tracking-widest text-subtle uppercase">{label}</span>
-      <span className={cn("whitespace-nowrap font-mono text-2xs tabular-nums text-fg", valueClass)}>
-        {value}
-      </span>
     </div>
   );
 }

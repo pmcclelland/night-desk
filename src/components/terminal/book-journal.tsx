@@ -1,5 +1,8 @@
+import { ReviewCard, ReviewEmpty } from "@/components/terminal/review-card";
 import { formatHold, formatJournalDay, type JournalRow } from "@/lib/book-journal";
 import { pct, px, signClass, signedMoney } from "@/lib/format";
+import { journalSidePlain } from "@/lib/review-copy";
+import { nameOf } from "@/lib/universe";
 import { cn } from "@/lib/cn";
 
 export function BookJournal({
@@ -16,106 +19,58 @@ export function BookJournal({
   onPick: (id: string, symbol: string) => void;
 }) {
   return (
-    <section className="min-h-0 shrink-0 border-t border-border bg-surface">
-      <div className="flex items-baseline gap-2 px-3 py-2">
-        <p className="font-mono text-micro tracking-widest text-subtle uppercase">
-          Journal · {rows.length} closed
-        </p>
-        {sim ? (
-          <p className="font-mono text-micro tracking-widest text-muted uppercase">Sim</p>
-        ) : null}
-      </div>
+    <ReviewCard
+      title="Closed trades"
+      dek="Round trips that are done — what you made or lost after getting out."
+      hint={sim ? "From the practice book, not a live brokerage account." : undefined}
+    >
       {loading && rows.length === 0 ? (
-        <p className="px-3 pb-3 font-mono text-micro tracking-widest text-subtle uppercase">
-          Loading journal
-        </p>
+        <ReviewEmpty>Looking up closed trades…</ReviewEmpty>
       ) : rows.length === 0 ? (
-        <p className="px-3 pb-3 font-mono text-micro tracking-widest text-subtle uppercase">
-          {sim ? "No closed SIM trades" : "No closed trades"}
-        </p>
+        <ReviewEmpty>{sim ? "No closed practice trades in this window." : "No closed trades in this window."}</ReviewEmpty>
       ) : (
-        <div className="max-h-56 overflow-auto md:max-h-64">
-          <table className="w-full border-separate border-spacing-0 font-mono text-2xs tabular-nums">
-            <thead className="sticky top-0 bg-surface text-micro tracking-widest text-subtle uppercase">
-              <tr>
-                <th className="w-px whitespace-nowrap border-l-2 border-transparent px-2 py-1 text-left font-medium">
-                  Sym
-                </th>
-                <th className="hidden w-px whitespace-nowrap px-2 py-1 text-left font-medium sm:table-cell">
-                  Side
-                </th>
-                <th className="hidden w-px whitespace-nowrap px-2 py-1 text-right font-medium md:table-cell">
-                  In
-                </th>
-                <th className="hidden w-px whitespace-nowrap px-2 py-1 text-right font-medium md:table-cell">
-                  Out
-                </th>
-                <th className="w-px whitespace-nowrap px-2 py-1 text-right font-medium">
-                  Hold
-                </th>
-                <th className="w-px whitespace-nowrap px-2 py-1 text-right font-medium">P&L</th>
-                <th className="w-full px-2 py-1 text-left font-medium">Thesis</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => {
-                const key = `jr:${row.id}`;
-                const marked = cursor === key;
-                return (
-                  <tr
-                    key={row.id}
-                    data-journal={row.id}
-                    className={cn(
-                      "cursor-pointer border-t border-border/60",
-                      marked ? "bg-elevated" : "hover:bg-elevated/60",
-                    )}
-                    onClick={() => onPick(row.id, row.symbol)}
-                  >
-                    <td
-                      className={cn(
-                        "w-px whitespace-nowrap border-l-2 px-2 py-1.5 text-left text-fg",
-                        marked ? "border-accent" : "border-transparent",
-                      )}
-                    >
-                      {row.symbol}
-                    </td>
-                    <td className="hidden w-px whitespace-nowrap px-2 py-1.5 text-left text-muted sm:table-cell">
-                      {row.side}
-                    </td>
-                    <td className="hidden w-px whitespace-nowrap px-2 py-1.5 text-right text-muted md:table-cell">
-                      <span className="text-subtle">{formatJournalDay(row.entryAt)}</span> {px(row.entryPrice)}
-                    </td>
-                    <td className="hidden w-px whitespace-nowrap px-2 py-1.5 text-right text-muted md:table-cell">
-                      <span className="text-subtle">{formatJournalDay(row.exitAt)}</span> {px(row.exitPrice)}
-                    </td>
-                    <td className="w-px whitespace-nowrap px-2 py-1.5 text-right text-muted tabular-nums">
-                      {formatHold(row.holdMs)}
-                    </td>
-                    <td className={cn("w-px whitespace-nowrap px-2 py-1.5 text-right", signClass(row.realizedPl))}>
+        <ul className="divide-y divide-border/80">
+          {rows.map((row) => {
+            const key = `jr:${row.id}`;
+            const marked = cursor === key;
+            return (
+              <li key={row.id}>
+                <button
+                  type="button"
+                  data-journal={row.id}
+                  onClick={() => onPick(row.id, row.symbol)}
+                  className={cn(
+                    "flex w-full min-h-11 flex-col items-start gap-1 py-3 text-left",
+                    marked ? "bg-elevated px-2" : "hover:bg-elevated/60",
+                  )}
+                >
+                  <div className="flex w-full min-w-0 items-baseline justify-between gap-3">
+                    <span className="min-w-0 truncate text-sm text-fg">
+                      {nameOf(row.symbol)}{" "}
+                      <span className="font-mono text-2xs text-muted">{row.symbol}</span>
+                    </span>
+                    <span className={cn("shrink-0 font-mono text-sm tabular-nums", signClass(row.realizedPl))}>
                       {signedMoney(row.realizedPl)}{" "}
-                      <span className="text-micro">{pct(row.realizedPlPct)}</span>
-                    </td>
-                    <td className="w-full min-w-0 max-w-0 px-2 py-1.5 text-left">
-                      {row.snippet ? (
-                        <span className="flex min-w-0 items-baseline gap-2">
-                          {row.conviction ? (
-                            <span className="shrink-0 text-micro tracking-widest text-accent uppercase">
-                              {row.conviction}
-                            </span>
-                          ) : null}
-                          <span className="min-w-0 truncate text-subtle">{row.snippet}</span>
-                        </span>
-                      ) : (
-                        <span className="text-subtle">—</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                      <span className="text-xs">{pct(row.realizedPlPct)}</span>
+                    </span>
+                  </div>
+                  <p className="text-xs leading-relaxed text-muted text-pretty">
+                    {journalSidePlain(row.side)} · held {formatHold(row.holdMs)} · in{" "}
+                    {formatJournalDay(row.entryAt)} at {px(row.entryPrice)} · out{" "}
+                    {formatJournalDay(row.exitAt)} at {px(row.exitPrice)}
+                  </p>
+                  {row.snippet ? (
+                    <p className="min-w-0 truncate text-xs text-subtle">
+                      {row.conviction ? `${row.conviction} confidence · ` : ""}
+                      {row.snippet}
+                    </p>
+                  ) : null}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
       )}
-    </section>
+    </ReviewCard>
   );
 }
